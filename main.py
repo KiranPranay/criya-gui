@@ -1,602 +1,737 @@
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-import time, threading, json, datetime
+# main.py  — PySide6 light UI, scrollable columns, corrected backgrounds & alignment
+
+from __future__ import annotations
+import sys, json, datetime
+from typing import List, Dict, Optional
+from dataclasses import dataclass
+from PySide6 import QtCore, QtGui, QtWidgets
+
+# -------------------- optional qt-material (not required) --------------------
+try:
+    from qt_material import apply_stylesheet  # type: ignore
+    HAVE_QT_MATERIAL = True
+except Exception:
+    HAVE_QT_MATERIAL = False
+
+# -------------------- serial --------------------
 try:
     import serial
     import serial.tools.list_ports
-except ImportError:
+    HAVE_SERIAL = True
+except Exception:
     serial = None
+    HAVE_SERIAL = False
 
 
-class ScrollableFrame(ttk.Frame):
-    """Reusable vertical scrollable frame using Canvas + interior frame."""
-    def __init__(self, container, *args, **kwargs):
-        super().__init__(container, *args, **kwargs)
-        self.canvas = tk.Canvas(self, borderwidth=0, highlightthickness=0)
-        self.vscroll = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-        self.canvas.configure(yscrollcommand=self.vscroll.set)
-        self.inner = ttk.Frame(self.canvas)
-        self.inner.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas_frame = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.vscroll.pack(side="right", fill="y")
-        self.bind("<Configure>", self._resize)
+# -------------------- theme (Material-ish light) --------------------
+PRIMARY   = "#5B6AC4"  # replace with your brand color
+SECONDARY = "#00B8A9"
+ACCENT    = "#FF8A00"
+BG        = "#F9FAFB"  # page
+SURFACE   = "#FFFFFF"  # cards
+TEXT      = "#1F1F1F"
+TEXT_MUT  = "#5F6368"
+BORDER    = "#E6E8EB"
+OK_GREEN  = "#2E7D32"
+WARN_AMB  = "#F9A825"
+ERR_RED   = "#D32F2F"
 
-    def _resize(self, event):
-        # make inner frame match canvas width
-        self.canvas.itemconfig(self.canvas_frame, width=event.width - self.vscroll.winfo_width())
+QSS = f"""
+/* Basics */
+QWidget {{
+  background: {BG};
+  color: {TEXT};
+  font-size: 14px;
+}}
+QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget {{
+  background: {BG};
+}}
+/* Cards */
+QGroupBox {{
+  background: {SURFACE};
+  border: 1px solid {BORDER};
+  border-radius: 10px;
+  margin-top: 10px;
+}}
+QGroupBox::title {{
+  subcontrol-origin: margin;
+  left: 12px;
+  padding: 4px 6px;
+  color: {TEXT_MUT};
+  font-weight: 600;
+}}
+/* Inputs */
+QLineEdit, QComboBox {{
+  background: #fff;
+  border: 1px solid {BORDER};
+  border-radius: 8px;
+  padding: 8px 10px;
+}}
+QComboBox QAbstractItemView {{
+  background: #fff;
+  border: 1px solid {BORDER};
+}}
+/* Buttons */
+QPushButton {{
+  background: {PRIMARY};
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 14px;
+  min-height: 34px;
+}}
+QPushButton[flat="true"] {{    /* secondary/flat */
+  background: #EEF0F3;
+  color: {TEXT};
+}}
+QPushButton[warn="true"] {{    /* warning */
+  background: {WARN_AMB};
+  color: #000;
+}}
+QPushButton[danger="true"] {{  /* danger */
+  background: {ERR_RED};
+  color: #fff;
+}}
+QPushButton:disabled {{
+  background: #CFD4DA; color: #fff;
+}}
+/* Sliders */
+QSlider::groove:horizontal {{
+  height: 6px; background: #E7E9EC; border-radius: 3px;
+}}
+QSlider::handle:horizontal {{
+  background: {SECONDARY};
+  width: 18px; height: 18px; margin: -6px 0; border-radius: 9px;
+}}
+/* Table */
+QHeaderView::section {{
+  background: #F3F5F8; color: {TEXT};
+  padding: 8px; border: 1px solid {BORDER};
+}}
+QTableWidget {{
+  background: #fff;
+  gridline-color: {BORDER};
+  selection-background-color: #D9F3EF;
+  selection-color: {TEXT};
+}}
+/* Splitter */
+QSplitter::handle {{
+  background: {BG};      /* remove the dark bar */
+  width: 8px;
+}}
+QStatusBar {{
+  background: transparent; color: {TEXT};
+}}
+"""
 
 
-class RobotArmGUI:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Criya - Stack Assembly Robot")
-        self.root.minsize(1080, 650)
+# -------------------- data --------------------
+@dataclass
+class SeqStep:
+    kind: str                   # "pos" or "angles"
+    dwell_ms: int
+    speed: int                  # 1..100 (lower = faster)
+    pos_name: Optional[str] = None
+    angles: Optional[List[int]] = None
+    label: str = ""
 
-        # --- runtime state ---
-        self.ser = None
-        self.serial_lock = threading.Lock()
-        self.runner_thread = None
-        self.runner_stop = threading.Event()
-        self.is_running_sequence = False
-        self._move_done = threading.Event()          # <-- signals smooth_move completion
 
-        # status
-        self.status_var = tk.StringVar(value="Disconnected")
+# -------------------- serial helper --------------------
+class SerialLink(QtCore.QObject):
+    statusChanged = QtCore.Signal(str, str)
+    portsChanged  = QtCore.Signal(list)
 
-        # angles
-        self.angles = [90, 90, 90, 90, 90, 90]
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.ser: Optional[serial.Serial] = None
+        self.debounce_timers = [None]*6
+        self.last_sent = [None]*6
+        self.debounce_ms = 25
+        self.port = ""; self.baud = 9600
 
-        # reset defaults (Servo1=0 others 90)
-        self.reset_defaults = [0, 90, 90, 90, 90, 90]
-
-        # saved positions {name: [a1..a6]}
-        self.saved_positions = {}
-
-        # sequence: list of dicts -> supports either named or raw angles
-        #   {kind: 'pos', pos: name, dwell: ms, speed: 1..100}
-        #   {kind: 'angles', angles: [..], label: str, dwell: ms, speed: 1..100}
-        self.sequence = []
-
-        # send throttling per-servo
-        self._pending_send_after = {}
-        self._last_sent_angles = self.angles[:]
-        self._smooth_move_job = None
-
-        # ----- layout: PanedWindow with two scrollable sides -----
-        paned = ttk.Panedwindow(root, orient=tk.HORIZONTAL)
-        paned.pack(fill="both", expand=True)
-
-        left_scroll = ScrollableFrame(paned)
-        right_scroll = ScrollableFrame(paned)
-        paned.add(left_scroll, weight=1)
-        paned.add(right_scroll, weight=1)
-
-        left = left_scroll.inner
-        right = right_scroll.inner
-
-        # Connection box
-        conn_box = ttk.LabelFrame(left, text="Connection")
-        conn_box.pack(fill="x", pady=6, padx=6)
-
-        self.port_cb = ttk.Combobox(conn_box, values=self.get_ports(), state="readonly", width=18)
-        self.port_cb.pack(side="left", padx=6, pady=6)
-        ttk.Button(conn_box, text="Refresh", command=self.refresh_ports).pack(side="left", padx=4)
-
-        ttk.Label(conn_box, text="Baud").pack(side="left", padx=(8, 0))
-        self.baud_cb = ttk.Combobox(conn_box, values=[9600, 19200, 38400, 57600, 115200], width=8)
-        self.baud_cb.set(9600)  # default to match your Arduino sketch
-        self.baud_cb.pack(side="left", padx=6)
-
-        self.connect_btn = ttk.Button(conn_box, text="Connect", command=self.connect_serial)
-        self.connect_btn.pack(side="left", padx=4)
-        self.disconnect_btn = ttk.Button(conn_box, text="Disconnect", command=self.disconnect_serial, state="disabled")
-        self.disconnect_btn.pack(side="left", padx=4)
-        self.reconnect_btn = ttk.Button(conn_box, text="Force Reconnect", command=self.force_reconnect)
-        self.reconnect_btn.pack(side="left", padx=4)
-
-        # speed box
-        spd_box = ttk.LabelFrame(left, text="Speed (lower = faster)")
-        spd_box.pack(fill="x", pady=6, padx=6)
-        self.speed_var = tk.DoubleVar(value=30)
-        self.speed_scale = ttk.Scale(spd_box, from_=1, to=100, variable=self.speed_var, orient="horizontal")
-        self.speed_scale.pack(fill="x", padx=6, pady=6)
-        ttk.Label(spd_box, textvariable=self.speed_var).pack()
-
-        # Defaults editor
-        defaults_box = ttk.LabelFrame(left, text="Default Reset Positions")
-        defaults_box.pack(fill="x", pady=6, padx=6)
-        self.default_entries = []
-        for i in range(6):
-            row = ttk.Frame(defaults_box)
-            row.pack(fill="x", pady=2)
-            ttk.Label(row, text=f"Servo {i+1}").pack(side="left")
-            var = tk.StringVar(value=str(self.reset_defaults[i]))
-            ttk.Entry(row, textvariable=var, width=5).pack(side="left", padx=4)
-            self.default_entries.append(var)
-        ttk.Button(defaults_box, text="Apply Defaults", command=self.apply_defaults).pack(fill="x", pady=2)
-        ttk.Button(defaults_box, text="Reset to Factory Defaults", command=self.reset_factory_defaults).pack(fill="x", pady=2)
-
-        # Action buttons (Reset/Stop)
-        action_box = ttk.Frame(left)
-        action_box.pack(fill="x", pady=6, padx=6)
-        ttk.Button(action_box, text="Reset Positions", command=self.reset_positions).pack(side="left", expand=True, fill="x", padx=2)
-        ttk.Button(action_box, text="Stop All", command=self.stop_all).pack(side="left", expand=True, fill="x", padx=2)
-
-        # Saved Positions
-        pos_box = ttk.LabelFrame(left, text="Saved Positions")
-        pos_box.pack(fill="both", expand=False, pady=6, padx=6)
-
-        name_row = ttk.Frame(pos_box)
-        name_row.pack(fill="x", padx=4, pady=2)
-        ttk.Label(name_row, text="Name:").pack(side="left")
-        self.pos_name_var = tk.StringVar()
-        ttk.Entry(name_row, textvariable=self.pos_name_var, width=18).pack(side="left", padx=4)
-        ttk.Button(name_row, text="Save Current", command=self.save_current_position).pack(side="left", padx=2)
-        ttk.Button(name_row, text="Update", command=self.update_selected_position).pack(side="left", padx=2)
-
-        list_row = ttk.Frame(pos_box)
-        list_row.pack(fill="both", expand=True, padx=4, pady=2)
-        self.pos_list = tk.Listbox(list_row, height=6)
-        self.pos_list.pack(side="left", fill="both", expand=True)
-        sb = ttk.Scrollbar(list_row, command=self.pos_list.yview)
-        self.pos_list.config(yscrollcommand=sb.set)
-        sb.pack(side="left", fill="y")
-
-        btn_row = ttk.Frame(pos_box)
-        btn_row.pack(fill="x", padx=4, pady=2)
-        ttk.Button(btn_row, text="Move To", command=self.move_to_selected_position).pack(side="left", padx=2)
-        ttk.Button(btn_row, text="Delete", command=self.delete_selected_position).pack(side="left", padx=2)
-        ttk.Button(btn_row, text="Export", command=self.export_positions).pack(side="left", padx=2)
-        ttk.Button(btn_row, text="Import", command=self.import_positions).pack(side="left", padx=2)
-
-        # Program Sequencer
-        prog_box = ttk.LabelFrame(left, text="Program / Sequence")
-        prog_box.pack(fill="both", expand=True, pady=6, padx=6)
-
-        # sequence table + scrollbar
-        tree_frame = ttk.Frame(prog_box)
-        tree_frame.pack(fill="both", expand=True)
-        self.seq_tree = ttk.Treeview(tree_frame, columns=("#", "Step", "Dwell(ms)", "Speed"), show="headings", height=6)
-        for col, w in (("#", 60), ("Step", 220), ("Dwell(ms)", 100), ("Speed", 80)):
-            self.seq_tree.heading(col, text=col)
-            self.seq_tree.column(col, width=w, anchor="center")
-        self.seq_tree.pack(side="left", fill="both", expand=True)
-        seq_sb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.seq_tree.yview)
-        self.seq_tree.configure(yscrollcommand=seq_sb.set)
-        seq_sb.pack(side="left", fill="y")
-
-        # Add-step controls
-        controls = ttk.Frame(prog_box)
-        controls.pack(fill="x", padx=4, pady=4)
-        ttk.Label(controls, text="Use position:").pack(side="left")
-        self.add_pos_cb = ttk.Combobox(controls, values=[], width=18, state="readonly")
-        self.add_pos_cb.pack(side="left", padx=4)
-        ttk.Label(controls, text="Dwell(ms)").pack(side="left")
-        self.add_dwell = tk.StringVar(value="500")
-        ttk.Entry(controls, textvariable=self.add_dwell, width=7).pack(side="left", padx=2)
-        ttk.Label(controls, text="Speed").pack(side="left")
-        self.add_speed = tk.StringVar(value="30")
-        ttk.Entry(controls, textvariable=self.add_speed, width=5).pack(side="left", padx=2)
-        ttk.Button(controls, text="Add Step", command=self.add_step).pack(side="left", padx=6)
-        ttk.Button(controls, text="Add Current (no save)", command=self.add_step_current).pack(side="left", padx=6)
-
-        row2 = ttk.Frame(prog_box)
-        row2.pack(fill="x", padx=4, pady=2)
-        ttk.Button(row2, text="Up", command=self.step_up).pack(side="left", padx=2)
-        ttk.Button(row2, text="Down", command=self.step_down).pack(side="left", padx=2)
-        ttk.Button(row2, text="Delete Step", command=self.delete_step).pack(side="left", padx=2)
-        self.loop_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(row2, text="Loop", variable=self.loop_var).pack(side="left", padx=10)
-
-        row3 = ttk.Frame(prog_box)
-        row3.pack(fill="x", padx=4, pady=2)
-        ttk.Button(row3, text="Run Sequence", command=self.run_sequence).pack(side="left", padx=2)
-        ttk.Button(row3, text="Stop Sequence", command=self.stop_sequence).pack(side="left", padx=2)
-        ttk.Button(row3, text="Save Seq", command=self.export_sequence).pack(side="left", padx=2)
-        ttk.Button(row3, text="Load Seq", command=self.import_sequence).pack(side="left", padx=2)
-
-        # Servo sliders on right (also scrollable)
-        servo_box = ttk.LabelFrame(right, text="Servo Controls")
-        servo_box.pack(fill="both", expand=True, padx=6, pady=6)
-
-        self.servo_scales = []
-        self.servo_entries = []
-        for i in range(6):
-            frame = ttk.Frame(servo_box)
-            frame.pack(fill="x", pady=4)
-            ttk.Label(frame, text=f"Servo {i+1}").pack(side="left")
-            scale = ttk.Scale(frame, from_=0, to=180, orient="horizontal")
-            scale.set(self.angles[i])
-            scale.pack(side="left", fill="x", expand=True, padx=6)
-            scale.bind("<B1-Motion>", lambda e, idx=i: self.update_angle(idx))
-            scale.bind("<ButtonRelease-1>", lambda e, idx=i: self.update_angle(idx))
-            self.servo_scales.append(scale)
-
-            entry_var = tk.StringVar(value=str(self.angles[i]))
-            entry = ttk.Entry(frame, textvariable=entry_var, width=5)
-            entry.pack(side="left", padx=4)
-            entry.bind("<Return>", lambda e, idx=i, var=entry_var: self.set_angle_from_entry(idx, var))
-            self.servo_entries.append(entry_var)
-
-            ttk.Label(frame, textvariable=entry_var).pack(side="left")
-
-        # Status bar
-        self.status_label = tk.Label(root, textvariable=self.status_var, relief="sunken", anchor="w")
-        self.status_label.pack(side="bottom", fill="x")
-        self.update_status("Disconnected", "red")
-
-        # Background checker
-        self.root.after(1000, self.check_connection)
-
-    # ------------------- serial / status -------------------
-    def get_ports(self):
-        if serial:
-            return [p.device for p in serial.tools.list_ports.comports()]
-        return []
+    def available_ports(self) -> List[str]:
+        if not HAVE_SERIAL: return []
+        return [p.device for p in serial.tools.list_ports.comports()]
 
     def refresh_ports(self):
-        self.port_cb["values"] = self.get_ports()
+        self.portsChanged.emit(self.available_ports())
 
-    def connect_serial(self):
-        if not serial:
-            messagebox.showwarning("pyserial missing", "pyserial not installed.")
-            return
-        port = self.port_cb.get()
-        if not port:
-            messagebox.showinfo("Select port", "Choose a COM port")
-            return
-        baud = int(self.baud_cb.get())
+    def connect(self, port: str, baud: int):
+        if not HAVE_SERIAL:
+            self.statusChanged.emit("pyserial not installed", ERR_RED); return
         try:
+            if self.ser and self.ser.is_open: self.ser.close()
             self.ser = serial.Serial(port, baudrate=baud, timeout=0.05, write_timeout=0.05)
-            self.update_status(f"Connected to {port} @ {baud}", "green")
-            self.connect_btn.config(state="disabled")
-            self.disconnect_btn.config(state="normal")
-            self.send_all_angles(self.reset_defaults)  # auto reset servos
+            self.port, self.baud = port, baud
+            self.statusChanged.emit(f"Connected to {port} @ {baud}", OK_GREEN)
         except Exception as e:
-            self.update_status(f"Error: {e}", "red")
+            self.statusChanged.emit(f"Error: {e}", ERR_RED)
 
-    def disconnect_serial(self):
-        if self.ser and self.ser.is_open:
-            try:
-                self.ser.close()
-            except Exception:
-                pass
+    def disconnect(self):
+        try:
+            if self.ser and self.ser.is_open: self.ser.close()
+        except Exception:
+            pass
         self.ser = None
-        self.update_status("Disconnected", "red")
-        self.connect_btn.config(state="normal")
-        self.disconnect_btn.config(state="disabled")
+        self.statusChanged.emit("Disconnected", ERR_RED)
 
     def force_reconnect(self):
-        self.update_status("Reconnecting...", "orange")
-        self.disconnect_serial()
-        self.root.after(500, self.connect_serial)
+        if self.port and self.baud:
+            self.disconnect()
+            QtCore.QTimer.singleShot(300, lambda: self.connect(self.port, self.baud))
+        else:
+            self.statusChanged.emit("Pick a port & baud first", WARN_AMB)
 
-    def check_connection(self):
-        if self.ser and not self.ser.is_open:
-            self.update_status("Lost connection. Reconnecting...", "orange")
+    def _write_raw(self, b: bytes):
+        if not self.ser or not self.ser.is_open: return
+        try:
+            self.ser.write(b)
+        except Exception as e:
+            self.statusChanged.emit(f"Write error: {e}. Reconnecting…", ERR_RED)
             self.force_reconnect()
-        self.root.after(1000, self.check_connection)
 
-    def update_status(self, message, color):
-        self.status_var.set(message)
-        self.status_label.config(fg=color)
+    def send_angle(self, idx: int, angle: int):
+        t: Optional[QtCore.QTimer] = self.debounce_timers[idx]
+        if t: t.stop()
+        t = QtCore.QTimer(self); t.setSingleShot(True); t.setInterval(self.debounce_ms)
+        def _do():
+            if self.last_sent[idx] != angle:
+                self._write_raw(f"{idx+1}:{angle}\n".encode()); self.last_sent[idx] = angle
+        t.timeout.connect(_do); t.start()
+        self.debounce_timers[idx] = t
 
-    # ------------------- servo I/O -------------------
-    def send_angle(self, idx, angle):
-        """Debounced send: coalesce rapid slider updates to ~40 FPS (25ms)."""
-        if idx in self._pending_send_after:
-            self.root.after_cancel(self._pending_send_after[idx])
-
-        def _do_send():
-            self._pending_send_after.pop(idx, None)
-            with self.serial_lock:
-                if self.ser and self.ser.is_open:
-                    try:
-                        if self._last_sent_angles[idx] != angle:
-                            msg = f"{idx+1}:{angle}\n".encode()
-                            self.ser.write(msg)
-                            self._last_sent_angles[idx] = angle
-                    except Exception:
-                        self.update_status("Write error. Reconnecting...", "red")
-                        self.force_reconnect()
-
-        self._pending_send_after[idx] = self.root.after(25, _do_send)
-
-    def send_all_angles(self, angles):
+    def send_all(self, angles: List[int]):
         for i, a in enumerate(angles):
             self.send_angle(i, a)
 
-    def update_angle(self, idx):
-        angle = int(self.servo_scales[idx].get())
-        self.angles[idx] = angle
-        self.servo_entries[idx].set(str(angle))
-        self.send_angle(idx, angle)
 
-    def set_angle_from_entry(self, idx, var):
+# -------------------- main window --------------------
+class MainWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Criya – Stack Assembly Robot (Qt)")
+        self.resize(1280, 860)
+        self.setMinimumSize(1020, 720)
+
+        # state
+        self.link = SerialLink(self)
+        self.angles = [90]*6
+        self.reset_defaults = [0,90,90,90,90,90]
+        self.saved_positions: Dict[str, List[int]] = {}
+        self.sequence: List[SeqStep] = []
+
+        # smooth move (timer-based)
+        self.smooth_timer = QtCore.QTimer(self)
+        self.smooth_timer.timeout.connect(self._smooth_step)
+        self.smooth_steps = 40
+        self.smooth_step_idx = 0
+        self.smooth_start = self.angles[:]
+        self.smooth_target = self.angles[:]
+        self.smooth_delay_ms = 120
+        self.move_done_callbacks: List[callable] = []
+
+        # sequence
+        self.seq_running = False
+        self.seq_index = 0
+        self.dwell_timer = QtCore.QTimer(self); self.dwell_timer.setSingleShot(True)
+        self.dwell_timer.timeout.connect(self._seq_next)
+
+        # UI
+        self._build_ui()
+
+        # signals
+        self.link.statusChanged.connect(self._set_status)
+        self.link.portsChanged.connect(self._fill_ports)
+        self._fill_ports(self.link.available_ports())
+        self._set_status("Disconnected", ERR_RED)
+
+        # connection monitor
+        self._conn_timer = QtCore.QTimer(self)
+        self._conn_timer.timeout.connect(self._check_connection)
+        self._conn_timer.start(1000)
+
+    # ---------- ui ----------
+    def _build_ui(self):
+        splitter = QtWidgets.QSplitter(self)
+        splitter.setOrientation(QtCore.Qt.Orientation.Horizontal)
+        self.setCentralWidget(splitter)
+
+        # LEFT scroll column
+        left_scroll = QtWidgets.QScrollArea(); left_scroll.setWidgetResizable(True)
+        left = QtWidgets.QWidget(); left_scroll.setWidget(left)
+        L = QtWidgets.QVBoxLayout(left); L.setContentsMargins(16,16,16,16); L.setSpacing(14)
+
+        # RIGHT scroll column
+        right_scroll = QtWidgets.QScrollArea(); right_scroll.setWidgetResizable(True)
+        right = QtWidgets.QWidget(); right_scroll.setWidget(right)
+        R = QtWidgets.QVBoxLayout(right); R.setContentsMargins(16,16,16,16); R.setSpacing(14)
+
+        splitter.addWidget(left_scroll); splitter.addWidget(right_scroll)
+        splitter.setStretchFactor(0, 2); splitter.setStretchFactor(1, 1)
+
+        # left groups
+        L.addWidget(self._grp_connection())
+        L.addWidget(self._grp_speed())
+        L.addWidget(self._grp_defaults())
+        L.addWidget(self._grp_actions())
+        L.addWidget(self._grp_positions())
+        L.addWidget(self._grp_sequence())
+        L.addStretch(1)
+
+        # right group
+        R.addWidget(self._grp_servos()); R.addStretch(1)
+
+        # status bar
+        self.status_label = QtWidgets.QLabel("")
+        self.statusBar().addWidget(self.status_label, 1)
+
+    def _card(self, title: str) -> QtWidgets.QGroupBox:
+        g = QtWidgets.QGroupBox(title)
+        v = QtWidgets.QVBoxLayout(g)
+        v.setContentsMargins(14,14,14,10)
+        v.setSpacing(10)
+        return g
+
+    # --- groups
+    def _grp_connection(self):
+        g = self._card("Connection")
+
+        # One clean row
+        row = QtWidgets.QHBoxLayout()
+        self.portCombo = QtWidgets.QComboBox(); self.portCombo.setMinimumWidth(220)
+        self.baudCombo = QtWidgets.QComboBox(); self.baudCombo.addItems(["9600","19200","38400","57600","115200"]); self.baudCombo.setCurrentText("9600")
+        btn_refresh = QtWidgets.QPushButton("Refresh"); btn_refresh.setProperty("flat", True)
+        btn_connect = QtWidgets.QPushButton("Connect")
+        btn_disconnect = QtWidgets.QPushButton("Disconnect"); btn_disconnect.setProperty("danger", True)
+        btn_reconnect  = QtWidgets.QPushButton("Force Reconnect"); btn_reconnect.setProperty("warn", True)
+
+        form = QtWidgets.QFormLayout(); form.setLabelAlignment(QtCore.Qt.AlignRight)
+        form.addRow("Port", self.portCombo); form.addRow("Baud", self.baudCombo)
+
+        row.addLayout(form, 1); row.addSpacing(8)
+        row.addWidget(btn_refresh)
+        row.addSpacing(8)
+        row.addWidget(btn_connect)
+        row.addWidget(btn_disconnect)
+        row.addWidget(btn_reconnect)
+        g.layout().addLayout(row)
+
+        btn_refresh.clicked.connect(self.link.refresh_ports)
+        btn_connect.clicked.connect(lambda: self.link.connect(self.portCombo.currentText(), int(self.baudCombo.currentText())))
+        btn_disconnect.clicked.connect(self.link.disconnect)
+        btn_reconnect.clicked.connect(self.link.force_reconnect)
+        return g
+
+    def _grp_speed(self):
+        g = self._card("Speed (lower = faster)")
+        row = QtWidgets.QHBoxLayout()
+        self.speedSlider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal); self.speedSlider.setRange(1,100); self.speedSlider.setValue(30)
+        self.speedLabel = QtWidgets.QLabel("30"); self.speedLabel.setMinimumWidth(32)
+        self.speedSlider.valueChanged.connect(lambda v: self.speedLabel.setText(str(v)))
+        row.addWidget(self.speedSlider, 1); row.addWidget(self.speedLabel)
+        g.layout().addLayout(row); return g
+
+    def _grp_defaults(self):
+        g = self._card("Default Reset Positions")
+        grid = QtWidgets.QGridLayout(); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(8)
+        self.defaultEdits: List[QtWidgets.QLineEdit] = []
+        for i in range(6):
+            grid.addWidget(QtWidgets.QLabel(f"Servo {i+1}"), i, 0)
+            e = QtWidgets.QLineEdit(str(self.reset_defaults[i])); e.setFixedWidth(80)
+            self.defaultEdits.append(e); grid.addWidget(e, i, 1)
+        btns = QtWidgets.QHBoxLayout()
+        btn_apply = QtWidgets.QPushButton("Apply Defaults")
+        btn_factory = QtWidgets.QPushButton("Reset to Factory"); btn_factory.setProperty("flat", True)
+        btns.addWidget(btn_apply); btns.addWidget(btn_factory)
+        g.layout().addLayout(grid); g.layout().addLayout(btns)
+        btn_apply.clicked.connect(self._apply_defaults)
+        btn_factory.clicked.connect(self._factory_defaults)
+        return g
+
+    def _grp_actions(self):
+        g = self._card("Actions")
+        row = QtWidgets.QHBoxLayout()
+        btn_reset = QtWidgets.QPushButton("Reset Positions")
+        btn_stop  = QtWidgets.QPushButton("Stop All"); btn_stop.setProperty("danger", True)
+        row.addWidget(btn_reset); row.addWidget(btn_stop)
+        g.layout().addLayout(row)
+        btn_reset.clicked.connect(self.reset_positions)
+        btn_stop.clicked.connect(self.stop_all)
+        return g
+
+    def _grp_positions(self):
+        g = self._card("Saved Positions")
+        form = QtWidgets.QFormLayout()
+        self.posName = QtWidgets.QLineEdit(); self.posName.setPlaceholderText("Name")
+        form.addRow("Name", self.posName)
+        g.layout().addLayout(form)
+
+        rowTop = QtWidgets.QHBoxLayout()
+        btn_save = QtWidgets.QPushButton("Save Current")
+        btn_update = QtWidgets.QPushButton("Update Selected"); btn_update.setProperty("flat", True)
+        rowTop.addWidget(btn_save); rowTop.addWidget(btn_update)
+        g.layout().addLayout(rowTop)
+
+        self.posList = QtWidgets.QListWidget(); self.posList.setMinimumHeight(150)
+        g.layout().addWidget(self.posList)
+
+        row = QtWidgets.QHBoxLayout()
+        btn_move = QtWidgets.QPushButton("Move To")
+        btn_delete= QtWidgets.QPushButton("Delete"); btn_delete.setProperty("danger", True)
+        btn_export= QtWidgets.QPushButton("Export"); btn_export.setProperty("flat", True)
+        btn_import= QtWidgets.QPushButton("Import"); btn_import.setProperty("flat", True)
+        row.addWidget(btn_move); row.addWidget(btn_delete); row.addWidget(btn_export); row.addWidget(btn_import)
+        g.layout().addLayout(row)
+
+        btn_save.clicked.connect(self._save_current_pos)
+        btn_update.clicked.connect(self._update_selected_pos)
+        btn_move.clicked.connect(self._move_to_selected_pos)
+        btn_delete.clicked.connect(self._delete_selected_pos)
+        btn_export.clicked.connect(self._export_positions)
+        btn_import.clicked.connect(self._import_positions)
+        return g
+
+    def _grp_sequence(self):
+        g = self._card("Program / Sequence")
+        self.seqTable = QtWidgets.QTableWidget(0, 4)
+        self.seqTable.setHorizontalHeaderLabels(["#", "Step", "Dwell (ms)", "Speed"])
+        self.seqTable.verticalHeader().setVisible(False)
+        self.seqTable.horizontalHeader().setStretchLastSection(True)
+        self.seqTable.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.seqTable.setMinimumHeight(220)
+        g.layout().addWidget(self.seqTable)
+
+        ctl1 = QtWidgets.QHBoxLayout()
+        self.addPosCombo = QtWidgets.QComboBox()
+        self.addDwell = QtWidgets.QLineEdit("500"); self.addDwell.setFixedWidth(90)
+        self.addSpeed = QtWidgets.QLineEdit("30");  self.addSpeed.setFixedWidth(70)
+        btn_add = QtWidgets.QPushButton("Add Step")
+        btn_add_curr = QtWidgets.QPushButton("Add Current (no save)"); btn_add_curr.setProperty("flat", True)
+        ctl1.addWidget(QtWidgets.QLabel("Use position:")); ctl1.addWidget(self.addPosCombo, 1)
+        ctl1.addWidget(QtWidgets.QLabel("Dwell (ms)")); ctl1.addWidget(self.addDwell)
+        ctl1.addWidget(QtWidgets.QLabel("Speed")); ctl1.addWidget(self.addSpeed)
+        ctl1.addWidget(btn_add); ctl1.addWidget(btn_add_curr)
+        g.layout().addLayout(ctl1)
+
+        ctl2 = QtWidgets.QHBoxLayout()
+        btn_up   = QtWidgets.QPushButton("Up"); btn_up.setProperty("flat", True)
+        btn_down = QtWidgets.QPushButton("Down"); btn_down.setProperty("flat", True)
+        btn_del  = QtWidgets.QPushButton("Delete Step"); btn_del.setProperty("danger", True)
+        self.loopCheck = QtWidgets.QCheckBox("Loop")
+        ctl2.addWidget(btn_up); ctl2.addWidget(btn_down); ctl2.addWidget(btn_del); ctl2.addStretch(1); ctl2.addWidget(self.loopCheck)
+        g.layout().addLayout(ctl2)
+
+        ctl3 = QtWidgets.QHBoxLayout()
+        btn_run = QtWidgets.QPushButton("Run Sequence")
+        btn_stop= QtWidgets.QPushButton("Stop Sequence"); btn_stop.setProperty("danger", True)
+        btn_save= QtWidgets.QPushButton("Save Seq"); btn_save.setProperty("flat", True)
+        btn_load= QtWidgets.QPushButton("Load Seq"); btn_load.setProperty("flat", True)
+        ctl3.addWidget(btn_run); ctl3.addWidget(btn_stop); ctl3.addStretch(1); ctl3.addWidget(btn_save); ctl3.addWidget(btn_load)
+        g.layout().addLayout(ctl3)
+
+        btn_add.clicked.connect(self._add_step_from_saved)
+        btn_add_curr.clicked.connect(self._add_step_from_current)
+        btn_up.clicked.connect(self._seq_up)
+        btn_down.clicked.connect(self._seq_down)
+        btn_del.clicked.connect(self._seq_delete)
+        btn_run.clicked.connect(self.run_sequence)
+        btn_stop.clicked.connect(self.stop_sequence)
+        btn_save.clicked.connect(self._export_sequence)
+        btn_load.clicked.connect(self._import_sequence)
+        return g
+
+    def _grp_servos(self):
+        g = self._card("Servo Controls")
+        grid = QtWidgets.QGridLayout(); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(10)
+        self.sliders: List[QtWidgets.QSlider] = []; self.edits: List[QtWidgets.QLineEdit] = []
+        for i in range(6):
+            grid.addWidget(QtWidgets.QLabel(f"Servo {i+1}"), i, 0)
+            s = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal); s.setRange(0,180); s.setValue(self.angles[i])
+            s.valueChanged.connect(lambda v, idx=i: self._on_slider(idx, v))
+            self.sliders.append(s); grid.addWidget(s, i, 1)
+            e = QtWidgets.QLineEdit(str(self.angles[i])); e.setFixedWidth(72)
+            def _apply(idx=i, edit=e):
+                try: v = max(0, min(180, int(edit.text())))
+                except Exception: v = self.angles[idx]
+                edit.setText(str(v)); self.angles[idx]=v; self.sliders[idx].setValue(v); self.link.send_angle(idx, v)
+            e.returnPressed.connect(_apply); self.edits.append(e); grid.addWidget(e, i, 2)
+        g.layout().addLayout(grid); return g
+
+    # ---------- status & connection ----------
+    @QtCore.Slot(list)
+    def _fill_ports(self, items: List[str]):
+        self.addPosCombo.clear()
+        self.portCombo.clear(); self.portCombo.addItems(items)
+
+    def _set_status(self, text: str, color: str):
+        self.status_label.setText(text)
+        self.status_label.setStyleSheet(f"color:{color};")
+
+    def _check_connection(self):
+        if self.link.ser and not self.link.ser.is_open:
+            self._set_status("Lost connection. Reconnecting…", WARN_AMB)
+            self.link.force_reconnect()
+
+    # ---------- defaults ----------
+    def _apply_defaults(self):
         try:
-            val = int(var.get())
-            val = max(0, min(180, val))
-            self.servo_scales[idx].set(val)
-            self.angles[idx] = val
-            var.set(str(val))
-            self.send_angle(idx, val)
-        except ValueError:
-            var.set(str(self.angles[idx]))
-
-    def smooth_move(self, target, speed_override=None, wait=False):
-        """Non-blocking smooth move using Tk 'after'.
-           If wait=True, block the caller until the move completes (safe from non-UI thread)."""
-        if self._smooth_move_job:
-            self.root.after_cancel(self._smooth_move_job)
-            self._smooth_move_job = None
-
-        self._move_done.clear()
-
-        start = self.angles[:]
-        steps = 40
-        base_speed = float(speed_override) if speed_override is not None else float(self.speed_var.get())
-        delay = max(1, int(base_speed / 200.0 * 1000))  # ms per step
-
-        t0 = {"step": 0}
-
-        def stepper():
-            s = t0["step"] + 1
-            t0["step"] = s
-            new = []
-            for i in range(6):
-                val = int(start[i] + (target[i] - start[i]) * s / steps)
-                val = max(0, min(180, val))
-                new.append(val)
-                self.servo_scales[i].set(val)
-                self.servo_entries[i].set(str(val))
-            self.angles = new
-            self.send_all_angles(new)
-
-            if s < steps and not self.runner_stop.is_set():
-                self._smooth_move_job = self.root.after(delay, stepper)
-            else:
-                self._smooth_move_job = None
-                self._move_done.set()
-
-        self._smooth_move_job = self.root.after(0, stepper)
-
-        if wait:
-            self._move_done.wait()
-
-    def reset_positions(self):
-        # From UI button: non-blocking so the UI doesn't freeze
-        self.smooth_move(self.reset_defaults, wait=False)
-
-    def stop_all(self):
-        self.runner_stop.set()
-        self.is_running_sequence = False
-        self.update_status("Stopped", "red")
-
-    # ------------------- defaults editor -------------------
-    def apply_defaults(self):
-        try:
-            self.reset_defaults = [int(var.get()) for var in self.default_entries]
-            self.update_status(f"Applied reset defaults: {self.reset_defaults}", "green")
-        except ValueError:
-            messagebox.showerror("Error", "Invalid reset default values")
-
-    def reset_factory_defaults(self):
-        self.reset_defaults = [0, 90, 90, 90, 90, 90]
-        for i, var in enumerate(self.default_entries):
-            var.set(str(self.reset_defaults[i]))
-        self.update_status("Factory defaults restored", "green")
-
-    # ------------------- saved positions -------------------
-    def refresh_pos_widgets(self):
-        self.pos_list.delete(0, tk.END)
-        for name in sorted(self.saved_positions.keys()):
-            self.pos_list.insert(tk.END, name)
-        self.add_pos_cb["values"] = sorted(self.saved_positions.keys())
-
-    def save_current_position(self):
-        name = self.pos_name_var.get().strip()
-        if not name:
-            name = datetime.datetime.now().strftime("pos_%H%M%S")
-            self.pos_name_var.set(name)
-        self.saved_positions[name] = self.angles[:]
-        self.refresh_pos_widgets()
-        self.update_status(f"Saved position '{name}' = {self.saved_positions[name]}", "green")
-
-    def get_selected_pos_name(self):
-        try:
-            idx = self.pos_list.curselection()[0]
-            return self.pos_list.get(idx)
+            vals = [max(0, min(180, int(e.text()))) for e in self.defaultEdits]
         except Exception:
-            return None
+            QtWidgets.QMessageBox.warning(self, "Invalid", "All defaults must be integers 0..180"); return
+        self.reset_defaults = vals; self._set_status(f"Defaults set: {self.reset_defaults}", OK_GREEN)
 
-    def update_selected_position(self):
-        name = self.get_selected_pos_name()
-        if not name:
-            messagebox.showinfo("Select", "Select a position to update")
-            return
+    def _factory_defaults(self):
+        self.reset_defaults = [0,90,90,90,90,90]
+        for i, e in enumerate(self.defaultEdits): e.setText(str(self.reset_defaults[i]))
+        self._set_status("Factory defaults restored", OK_GREEN)
+
+    # ---------- servo events ----------
+    def _on_slider(self, idx: int, val: int):
+        self.angles[idx]=val; self.edits[idx].setText(str(val)); self.link.send_angle(idx, val)
+
+    # ---------- smooth move ----------
+    def smooth_move(self, target: List[int], speed_override: Optional[int] = None, on_done: Optional[callable] = None):
+        if on_done: self.move_done_callbacks.append(on_done)
+        if self.smooth_timer.isActive(): self.smooth_timer.stop()
+        self.smooth_start = self.angles[:]
+        self.smooth_target = [max(0, min(180, int(a))) for a in target]
+        self.smooth_step_idx = 0
+        base = speed_override if speed_override is not None else self.speedSlider.value()
+        self.smooth_delay_ms = max(1, int(base/200.0*1000))   # lower = faster
+        self.smooth_timer.start(self.smooth_delay_ms)
+
+    def _smooth_step(self):
+        self.smooth_step_idx += 1
+        s = self.smooth_step_idx; steps = self.smooth_steps
+        new = []
+        for i in range(6):
+            v = int(self.smooth_start[i] + (self.smooth_target[i]-self.smooth_start[i]) * s / steps)
+            v = max(0, min(180, v)); new.append(v)
+            self.sliders[i].blockSignals(True); self.sliders[i].setValue(v); self.sliders[i].blockSignals(False)
+            self.edits[i].setText(str(v))
+        self.angles = new; self.link.send_all(new)
+        if s >= steps:
+            self.smooth_timer.stop()
+            cbs = self.move_done_callbacks[:]; self.move_done_callbacks.clear()
+            for cb in cbs:
+                try: cb()
+                except Exception: pass
+
+    # ---------- positions ----------
+    def _refresh_pos_combo(self):
+        self.addPosCombo.clear()
+        self.addPosCombo.addItems(sorted(self.saved_positions.keys()))
+
+    def _save_current_pos(self):
+        name = self.posName.text().strip() or datetime.datetime.now().strftime("pos_%H%M%S")
+        self.posName.setText(name)
         self.saved_positions[name] = self.angles[:]
-        self.update_status(f"Updated '{name}'", "green")
+        self._refresh_pos_list(); self._refresh_pos_combo()
+        self._set_status(f"Saved '{name}'", OK_GREEN)
 
-    def move_to_selected_position(self):
-        name = self.get_selected_pos_name()
-        if not name:
-            messagebox.showinfo("Select", "Select a position to move to")
-            return
-        target = self.saved_positions[name]
-        # From UI: don't block the Tk thread
-        self.smooth_move(target, wait=False)
+    def _refresh_pos_list(self):
+        self.posList.clear()
+        self.posList.addItems(sorted(self.saved_positions.keys()))
 
-    def delete_selected_position(self):
-        name = self.get_selected_pos_name()
+    def _selected_pos(self) -> Optional[str]:
+        sel = self.posList.selectedItems()
+        return sel[0].text() if sel else None
+
+    def _update_selected_pos(self):
+        name = self._selected_pos()
         if not name:
-            return
+            QtWidgets.QMessageBox.information(self, "Select", "Pick a position to update"); return
+        self.saved_positions[name] = self.angles[:]
+        self._set_status(f"Updated '{name}'", OK_GREEN)
+
+    def _move_to_selected_pos(self):
+        name = self._selected_pos()
+        if not name:
+            QtWidgets.QMessageBox.information(self, "Select", "Pick a position to move to"); return
+        self.smooth_move(self.saved_positions[name])
+
+    def _delete_selected_pos(self):
+        name = self._selected_pos()
+        if not name: return
         del self.saved_positions[name]
-        self.refresh_pos_widgets()
+        self._refresh_pos_list(); self._refresh_pos_combo()
 
-    def export_positions(self):
-        path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
-        if not path:
-            return
-        with open(path, "w") as f:
-            json.dump(self.saved_positions, f, indent=2)
-        self.update_status(f"Positions saved to {path}", "green")
+    def _export_positions(self):
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export Positions", "", "JSON (*.json)")
+        if not path: return
+        json.dump(self.saved_positions, open(path,"w"), indent=2)
+        self._set_status(f"Positions saved to {path}", OK_GREEN)
 
-    def import_positions(self):
-        path = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
-        if not path:
-            return
+    def _import_positions(self):
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Import Positions", "", "JSON (*.json)")
+        if not path: return
         try:
-            with open(path, "r") as f:
-                data = json.load(f)
-            for k, v in data.items():
-                if not (isinstance(v, list) and len(v) == 6):
-                    raise ValueError("Invalid positions file")
+            data = json.load(open(path,"r"))
+            for k,v in data.items():
+                if not (isinstance(v,list) and len(v)==6): raise ValueError("Invalid positions file")
             self.saved_positions.update(data)
-            self.refresh_pos_widgets()
-            self.update_status(f"Imported positions from {path}", "green")
+            self._refresh_pos_list(); self._refresh_pos_combo()
+            self._set_status(f"Imported positions from {path}", OK_GREEN)
         except Exception as e:
-            messagebox.showerror("Import error", str(e))
+            QtWidgets.QMessageBox.critical(self, "Import error", str(e))
 
-    # ------------------- program / sequence -------------------
-    def rebuild_seq_tree(self):
-        for iid in self.seq_tree.get_children():
-            self.seq_tree.delete(iid)
+    # ---------- sequence ----------
+    def _rebuild_seq_table(self):
+        self.seqTable.setRowCount(0)
         for i, step in enumerate(self.sequence, start=1):
-            if step["kind"] == "pos":
-                label = f"{step['pos']} (saved)"
-            else:
-                label = step.get("label", "current") + " (angles)"
-            self.seq_tree.insert("", tk.END, values=(i, label, step["dwell"], step["speed"]))
+            self.seqTable.insertRow(self.seqTable.rowCount())
+            label = step.pos_name+" (saved)" if step.kind=="pos" else (step.label or "angles")
+            self.seqTable.setItem(self.seqTable.rowCount()-1, 0, QtWidgets.QTableWidgetItem(str(i)))
+            self.seqTable.setItem(self.seqTable.rowCount()-1, 1, QtWidgets.QTableWidgetItem(label))
+            self.seqTable.setItem(self.seqTable.rowCount()-1, 2, QtWidgets.QTableWidgetItem(str(step.dwell_ms)))
+            self.seqTable.setItem(self.seqTable.rowCount()-1, 3, QtWidgets.QTableWidgetItem(str(step.speed)))
 
-    def add_step(self):
-        pos_name = self.add_pos_cb.get()
-        if not pos_name:
-            messagebox.showinfo("No position", "Choose a saved position or use 'Add Current (no save)'")
-            return
-        if pos_name not in self.saved_positions:
-            messagebox.showerror("Unknown position", "Selected position does not exist")
-            return
+    def _add_step_from_saved(self):
+        name = self.addPosCombo.currentText().strip()
+        if not name:
+            QtWidgets.QMessageBox.information(self, "No position", "Choose a saved position or use 'Add Current'"); return
+        if name not in self.saved_positions:
+            QtWidgets.QMessageBox.critical(self, "Unknown", "Selected position does not exist"); return
         try:
-            dwell = int(self.add_dwell.get())
-            speed = int(self.add_speed.get())
-        except ValueError:
-            messagebox.showerror("Invalid", "Dwell and Speed must be integers")
-            return
-        self.sequence.append({"kind": "pos", "pos": pos_name, "dwell": dwell, "speed": speed})
-        self.rebuild_seq_tree()
+            dwell = int(self.addDwell.text()); speed = int(self.addSpeed.text())
+        except Exception:
+            QtWidgets.QMessageBox.warning(self, "Invalid", "Dwell and Speed must be integers"); return
+        self.sequence.append(SeqStep(kind="pos", pos_name=name, dwell_ms=dwell, speed=speed))
+        self._rebuild_seq_table()
 
-    def add_step_current(self):
+    def _add_step_from_current(self):
         try:
-            dwell = int(self.add_dwell.get())
-            speed = int(self.add_speed.get())
-        except ValueError:
-            messagebox.showerror("Invalid", "Dwell and Speed must be integers")
-            return
+            dwell = int(self.addDwell.text()); speed = int(self.addSpeed.text())
+        except Exception:
+            QtWidgets.QMessageBox.warning(self, "Invalid", "Dwell and Speed must be integers"); return
         label = datetime.datetime.now().strftime("current_%H%M%S")
-        self.sequence.append({"kind": "angles", "angles": self.angles[:], "label": label, "dwell": dwell, "speed": speed})
-        self.rebuild_seq_tree()
+        self.sequence.append(SeqStep(kind="angles", angles=self.angles[:], label=label, dwell_ms=dwell, speed=speed))
+        self._rebuild_seq_table()
 
-    def _selected_step_index(self):
-        sel = self.seq_tree.selection()
-        if not sel:
-            return None
-        return self.seq_tree.index(sel[0])
+    def _selected_seq_index(self) -> Optional[int]:
+        sel = self.seqTable.selectionModel().selectedRows()
+        return sel[0].row() if sel else None
 
-    def delete_step(self):
-        idx = self._selected_step_index()
-        if idx is None:
-            return
-        self.sequence.pop(idx)
-        self.rebuild_seq_tree()
+    def _seq_delete(self):
+        idx = self._selected_seq_index()
+        if idx is None: return
+        del self.sequence[idx]; self._rebuild_seq_table()
 
-    def step_up(self):
-        idx = self._selected_step_index()
-        if idx is None or idx == 0:
-            return
-        self.sequence[idx - 1], self.sequence[idx] = self.sequence[idx], self.sequence[idx - 1]
-        self.rebuild_seq_tree()
-        self.seq_tree.selection_set(self.seq_tree.get_children()[idx - 1])
+    def _seq_up(self):
+        idx = self._selected_seq_index()
+        if idx is None or idx==0: return
+        self.sequence[idx-1], self.sequence[idx] = self.sequence[idx], self.sequence[idx-1]
+        self._rebuild_seq_table(); self.seqTable.selectRow(idx-1)
 
-    def step_down(self):
-        idx = self._selected_step_index()
-        if idx is None or idx >= len(self.sequence) - 1:
-            return
-        self.sequence[idx + 1], self.sequence[idx] = self.sequence[idx], self.sequence[idx + 1]
-        self.rebuild_seq_tree()
-        self.seq_tree.selection_set(self.seq_tree.get_children()[idx + 1])
+    def _seq_down(self):
+        idx = self._selected_seq_index()
+        if idx is None or idx >= len(self.sequence)-1: return
+        self.sequence[idx+1], self.sequence[idx] = self.sequence[idx], self.sequence[idx+1]
+        self._rebuild_seq_table(); self.seqTable.selectRow(idx+1)
 
-    def _run_sequence_worker(self):
-        try:
-            self.is_running_sequence = True
-            self.runner_stop.clear()
-            while not self.runner_stop.is_set():
-                for step in self.sequence:
-                    if self.runner_stop.is_set():
-                        break
-                    if step["kind"] == "pos":
-                        if step["pos"] not in self.saved_positions:
-                            self.update_status(f"Missing position '{step['pos']}'", "red")
-                            self.runner_stop.set()
-                            break
-                        target = self.saved_positions[step["pos"]]
-                        msg = f"Moving to {step['pos']}"
-                    else:
-                        target = step["angles"]
-                        msg = f"Moving to {step.get('label','angles')}"
-                    self.update_status(msg, "orange")
-                    # Wait for move to finish here (non-UI thread)
-                    self.smooth_move(target, speed_override=step["speed"], wait=True)
-                    self.update_status(f"Dwell {step['dwell']} ms", "orange")
-                    time.sleep(max(0, step["dwell"]) / 1000.0)
-                if not self.loop_var.get():
-                    break
-            self.update_status("Sequence finished", "green")
-        finally:
-            self.is_running_sequence = False
-            self.runner_stop.clear()
-
-    def run_sequence(self):
-        if self.is_running_sequence:
-            return
+    def _export_sequence(self):
         if not self.sequence:
-            messagebox.showinfo("Empty", "Add steps to the sequence")
-            return
-        self.runner_thread = threading.Thread(target=self._run_sequence_worker, daemon=True)
-        self.runner_thread.start()
+            QtWidgets.QMessageBox.information(self, "Empty", "Nothing to save"); return
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save Sequence", "", "JSON (*.json)")
+        if not path: return
+        data = []
+        for s in self.sequence:
+            d = dict(kind=s.kind, dwell=s.dwell_ms, speed=s.speed)
+            if s.kind == "pos": d["pos"] = s.pos_name
+            else: d["angles"] = s.angles; d["label"] = s.label
+            data.append(d)
+        json.dump(data, open(path, "w"), indent=2)
+        self._set_status(f"Sequence saved to {path}", OK_GREEN)
+
+    def _import_sequence(self):
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Load Sequence", "", "JSON (*.json)")
+        if not path: return
+        try:
+            seq = json.load(open(path, "r")); new: List[SeqStep] = []
+            for s in seq:
+                if "kind" not in s or "dwell" not in s or "speed" not in s:
+                    raise ValueError("Invalid sequence file")
+                if s["kind"] == "pos":
+                    new.append(SeqStep(kind="pos", pos_name=s.get("pos",""), dwell_ms=int(s["dwell"]), speed=int(s["speed"])))
+                else:
+                    new.append(SeqStep(kind="angles", angles=s.get("angles",[90]*6), label=s.get("label","angles"), dwell_ms=int(s["dwell"]), speed=int(s["speed"])))
+            self.sequence = new; self._rebuild_seq_table()
+            self._set_status(f"Loaded sequence from {path}", OK_GREEN)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Import error", str(e))
+
+    # sequencing with timers (no threads)
+    def run_sequence(self):
+        if self.seq_running: return
+        if not self.sequence:
+            QtWidgets.QMessageBox.information(self, "Empty", "Add steps first"); return
+        self.seq_running = True; self.seq_index = 0
+        self._set_status("Sequence running…", WARN_AMB)
+        self._seq_next()
 
     def stop_sequence(self):
-        self.runner_stop.set()
+        self.seq_running = False
+        self.dwell_timer.stop()
+        if self.smooth_timer.isActive(): self.smooth_timer.stop(); self.move_done_callbacks.clear()
+        self._set_status("Stopped", ERR_RED)
 
-    def export_sequence(self):
-        if not self.sequence:
-            messagebox.showinfo("Empty", "Nothing to save")
-            return
-        path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
-        if not path:
-            return
-        with open(path, "w") as f:
-            json.dump(self.sequence, f, indent=2)
-        self.update_status(f"Sequence saved to {path}", "green")
+    def _seq_next(self):
+        if not self.seq_running: return
+        if self.seq_index >= len(self.sequence):
+            if True and self.findChild(QtWidgets.QCheckBox, "", options=QtCore.Qt.FindDirectChildrenOnly):
+                pass
+            if False: pass
+            if getattr(self, "loopCheck", None) and self.loopCheck.isChecked():
+                self.seq_index = 0
+            else:
+                self.seq_running = False; self._set_status("Sequence finished", OK_GREEN); return
 
-    def import_sequence(self):
-        path = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
-        if not path:
-            return
+        step = self.sequence[self.seq_index]
+        if step.kind == "pos":
+            if step.pos_name not in self.saved_positions:
+                self._set_status(f"Missing saved position '{step.pos_name}'", ERR_RED)
+                self.seq_running = False; return
+            target = self.saved_positions[step.pos_name]; label = step.pos_name
+        else:
+            target = step.angles or self.angles[:]; label = step.label or "angles"
+
+        self._set_status(f"Moving to {label}", WARN_AMB)
+        def after_move():
+            self._set_status(f"Dwell {step.dwell_ms} ms", WARN_AMB)
+            self.dwell_timer.start(max(0, int(step.dwell_ms)))
+            self.seq_index += 1
+        self.smooth_move(target, speed_override=step.speed, on_done=after_move)
+
+    # top actions
+    def reset_positions(self):
+        self.smooth_move(self.reset_defaults)
+
+    def stop_all(self):
+        self.stop_sequence()
+
+
+# -------------------- app bootstrap --------------------
+def apply_light_theme(app: QtWidgets.QApplication):
+    if HAVE_QT_MATERIAL:
         try:
-            with open(path, "r") as f:
-                seq = json.load(f)
-            for s in seq:
-                if not (isinstance(s, dict) and "kind" in s and "dwell" in s and "speed" in s):
-                    raise ValueError("Invalid sequence file")
-            self.sequence = seq
-            self.rebuild_seq_tree()
-            self.update_status(f"Loaded sequence from {path}", "green")
-        except Exception as e:
-            messagebox.showerror("Import error", str(e))
+            apply_stylesheet(app, theme='light_cyan_500.xml', invert_secondary=False, extra={
+                'primaryColor': PRIMARY,
+                'secondaryColor': SECONDARY,
+                'warning': WARN_AMB,
+                'danger': ERR_RED,
+                'success': OK_GREEN,
+            })
+            return
+        except Exception:
+            pass
+    app.setStyleSheet(QSS)
 
+def main():
+    app = QtWidgets.QApplication(sys.argv)
+    app.setApplicationName("Criya Robot")
+    apply_light_theme(app)
+    win = MainWindow(); win.show()
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = RobotArmGUI(root)
-    root.mainloop()
+    main()
