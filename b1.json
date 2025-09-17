@@ -1,0 +1,86 @@
+[
+  {
+    "kind": "angles",
+    "angles": [
+      0,
+      90,
+      90,
+      90,
+      90,
+      72
+    ],
+    "label": "current_175446",
+    "dwell": 500,
+    "speed": 30
+  },
+  {
+    "kind": "angles",
+    "angles": [
+      0,
+      90,
+      90,
+      130,
+      90,
+      72
+    ],
+    "label": "current_175549",
+    "dwell": 500,
+    "speed": 30
+  },
+  {
+    "kind": "angles",
+    "angles": [
+      0,
+      90,
+      90,
+      130,
+      50,
+      72
+    ],
+    "label": "current_175623",
+    "dwell": 500,
+    "speed": 30
+  },
+  {
+    "kind": "angles",
+    "angles": [
+      0,
+      90,
+      90,
+      130,
+      50,
+      90
+    ],
+    "label": "current_175634",
+    "dwell": 500,
+    "speed": 30
+  },
+  {
+    "kind": "angles",
+    "angles": [
+      0,
+      90,
+      90,
+      130,
+      90,
+      90
+    ],
+    "label": "current_175641",
+    "dwell": 500,
+    "speed": 30
+  },
+  {
+    "kind": "angles",
+    "angles": [
+      0,
+      90,
+      90,
+      90,
+      90,
+      90
+    ],
+    "label": "current_175646",
+    "dwell": 500,
+    "speed": 30
+  }
+]
