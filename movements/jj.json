@@ -1,0 +1,26 @@
+[
+  {
+    "kind": "pos",
+    "dwell": 500,
+    "speed": 15,
+    "pos": "home"
+  },
+  {
+    "kind": "pos",
+    "dwell": 500,
+    "speed": 15,
+    "pos": "down"
+  },
+  {
+    "kind": "pos",
+    "dwell": 500,
+    "speed": 15,
+    "pos": "home2"
+  },
+  {
+    "kind": "pos",
+    "dwell": 500,
+    "speed": 15,
+    "pos": "down2"
+  }
+]

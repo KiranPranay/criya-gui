@@ -1,7 +1,7 @@
 # main.py  — PySide6 light UI, scrollable columns, corrected backgrounds & alignment
 
 from __future__ import annotations
-import sys, json, datetime
+import sys, json, datetime, math, os, subprocess
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -12,6 +12,8 @@ try:
     HAVE_QT_MATERIAL = True
 except Exception:
     HAVE_QT_MATERIAL = False
+
+CONFIG_FILE = "config.json"
 
 # -------------------- serial --------------------
 try:
@@ -144,10 +146,10 @@ class SerialLink(QtCore.QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.ser: Optional[serial.Serial] = None
-        self.debounce_timers = [None]*6
-        self.last_sent = [None]*6
+        self.debounce_timers = [None]*7
+        self.last_sent = [None]*7
         self.debounce_ms = 25
-        self.port = ""; self.baud = 9600
+        self.port = ""; self.baud = 115200
 
     def available_ports(self) -> List[str]:
         if not HAVE_SERIAL: return []
@@ -196,13 +198,19 @@ class SerialLink(QtCore.QObject):
         t = QtCore.QTimer(self); t.setSingleShot(True); t.setInterval(self.debounce_ms)
         def _do():
             if self.last_sent[idx] != angle:
-                self._write_raw(f"{idx+1}:{angle}\n".encode()); self.last_sent[idx] = angle
+                self._write_raw(f"{idx+1} {angle}\n".encode()); self.last_sent[idx] = angle
         t.timeout.connect(_do); t.start()
         self.debounce_timers[idx] = t
 
     def send_all(self, angles: List[int]):
+        # Use new Sync Write command 'M'
+        # Format: M <a1> <a2> ... <a7>\n
+        if not self.ser or not self.ser.is_open: return
+        msg = "M " + " ".join(map(str, angles)) + "\n"
+        self._write_raw(msg.encode())
+        # Update last_sent to avoid redundant individual updates immediately after
         for i, a in enumerate(angles):
-            self.send_angle(i, a)
+            self.last_sent[i] = a
 
 
 # -------------------- main window --------------------
@@ -215,12 +223,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # state
         self.link = SerialLink(self)
-        self.angles = [90]*6
-        self.reset_defaults = [0,90,90,90,90,90]
+        self.angles = [90]*7
+        self.reset_defaults = [0,90,90,90,90,90,90]
         self.saved_positions: Dict[str, List[int]] = {}
         self.sequence: List[SeqStep] = []
+        
+        # Config
+        self.config = self.load_config()
+        
+        # Smooth Manual Control State
+        # self.angles is the TARGET (UI). self.current_servo_pos is the PHYSICAL interpolated value.
+        self.current_servo_pos = [90.0]*7
+        self.control_timer = QtCore.QTimer(self)
+        self.control_timer.timeout.connect(self._control_loop)
+        self.control_timer.start(20) # 50Hz control loop
 
-        # smooth move (timer-based)
+        # smooth move (timer-based) -> Visual Animation Only now
         self.smooth_timer = QtCore.QTimer(self)
         self.smooth_timer.timeout.connect(self._smooth_step)
         self.smooth_steps = 40
@@ -250,6 +268,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._conn_timer.timeout.connect(self._check_connection)
         self._conn_timer.start(1000)
 
+    def load_config(self) -> dict:
+        if os.path.exists(CONFIG_FILE):
+            try: return json.load(open(CONFIG_FILE))
+            except: pass
+        return {"arduino_path": r"D:\programs\arduino\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe", "board": "arduino:avr:uno"}
+
+    def save_config(self):
+        json.dump(self.config, open(CONFIG_FILE, "w"), indent=2)
+
     # ---------- ui ----------
     def _build_ui(self):
         splitter = QtWidgets.QSplitter(self)
@@ -271,6 +298,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # left groups
         L.addWidget(self._grp_connection())
+        L.addWidget(self._grp_firmware())
         L.addWidget(self._grp_speed())
         L.addWidget(self._grp_defaults())
         L.addWidget(self._grp_actions())
@@ -299,7 +327,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # One clean row
         row = QtWidgets.QHBoxLayout()
         self.portCombo = QtWidgets.QComboBox(); self.portCombo.setMinimumWidth(220)
-        self.baudCombo = QtWidgets.QComboBox(); self.baudCombo.addItems(["9600","19200","38400","57600","115200"]); self.baudCombo.setCurrentText("9600")
+        self.baudCombo = QtWidgets.QComboBox(); self.baudCombo.addItems(["9600","19200","38400","57600","115200"]); self.baudCombo.setCurrentText("115200")
         btn_refresh = QtWidgets.QPushButton("Refresh"); btn_refresh.setProperty("flat", True)
         btn_connect = QtWidgets.QPushButton("Connect")
         btn_disconnect = QtWidgets.QPushButton("Disconnect"); btn_disconnect.setProperty("danger", True)
@@ -322,6 +350,48 @@ class MainWindow(QtWidgets.QMainWindow):
         btn_reconnect.clicked.connect(self.link.force_reconnect)
         return g
 
+        btn_reconnect.clicked.connect(self.link.force_reconnect)
+        return g
+
+    def _grp_firmware(self):
+        g = self._card("Firmware Upload")
+        
+        # Tool Path
+        row1 = QtWidgets.QHBoxLayout()
+        self.arduinoPath = QtWidgets.QLineEdit(self.config.get("arduino_path",""))
+        self.arduinoPath.setPlaceholderText("Path to arduino-cli.exe or arduino_debug.exe")
+        btn_browse = QtWidgets.QPushButton("..."); btn_browse.setFixedWidth(30)
+        btn_browse.setProperty("flat", True)
+        row1.addWidget(QtWidgets.QLabel("Tool:")); row1.addWidget(self.arduinoPath); row1.addWidget(btn_browse)
+        g.layout().addLayout(row1)
+
+        # Board & Upload
+        row2 = QtWidgets.QHBoxLayout()
+        self.boardCombo = QtWidgets.QComboBox()
+        self.boardCombo.addItems(["arduino:avr:uno", "arduino:avr:nano", "arduino:avr:mega", "arduino:avr:leonardo"])
+        self.boardCombo.setEditable(True)
+        self.boardCombo.setCurrentText(self.config.get("board", "arduino:avr:uno"))
+        
+        btn_upload = QtWidgets.QPushButton("Upload Firmware")
+        btn_upload.setProperty("warn", True)
+        
+        row2.addWidget(QtWidgets.QLabel("Board:")); row2.addWidget(self.boardCombo, 1); row2.addWidget(btn_upload)
+        g.layout().addLayout(row2)
+
+        def _browse():
+            path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select Arduino Tool", "", "Executables (*.exe)")
+            if path: self.arduinoPath.setText(path); self.config["arduino_path"]=path; self.save_config()
+        
+        def _upload():
+            self.config["board"] = self.boardCombo.currentText()
+            self.config["arduino_path"] = self.arduinoPath.text()
+            self.save_config()
+            self.upload_firmware()
+
+        btn_browse.clicked.connect(_browse)
+        btn_upload.clicked.connect(_upload)
+        return g
+
     def _grp_speed(self):
         g = self._card("Speed (lower = faster)")
         row = QtWidgets.QHBoxLayout()
@@ -335,7 +405,7 @@ class MainWindow(QtWidgets.QMainWindow):
         g = self._card("Default Reset Positions")
         grid = QtWidgets.QGridLayout(); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(8)
         self.defaultEdits: List[QtWidgets.QLineEdit] = []
-        for i in range(6):
+        for i in range(7):
             grid.addWidget(QtWidgets.QLabel(f"Servo {i+1}"), i, 0)
             e = QtWidgets.QLineEdit(str(self.reset_defaults[i])); e.setFixedWidth(80)
             self.defaultEdits.append(e); grid.addWidget(e, i, 1)
@@ -444,7 +514,7 @@ class MainWindow(QtWidgets.QMainWindow):
         g = self._card("Servo Controls")
         grid = QtWidgets.QGridLayout(); grid.setHorizontalSpacing(14); grid.setVerticalSpacing(10)
         self.sliders: List[QtWidgets.QSlider] = []; self.edits: List[QtWidgets.QLineEdit] = []
-        for i in range(6):
+        for i in range(7):
             grid.addWidget(QtWidgets.QLabel(f"Servo {i+1}"), i, 0)
             s = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal); s.setRange(0,180); s.setValue(self.angles[i])
             s.valueChanged.connect(lambda v, idx=i: self._on_slider(idx, v))
@@ -481,36 +551,60 @@ class MainWindow(QtWidgets.QMainWindow):
         self.reset_defaults = vals; self._set_status(f"Defaults set: {self.reset_defaults}", OK_GREEN)
 
     def _factory_defaults(self):
-        self.reset_defaults = [0,90,90,90,90,90]
+        self.reset_defaults = [0,90,90,90,90,90,90]
         for i, e in enumerate(self.defaultEdits): e.setText(str(self.reset_defaults[i]))
         self._set_status("Factory defaults restored", OK_GREEN)
 
     # ---------- servo events ----------
     def _on_slider(self, idx: int, val: int):
-        self.angles[idx]=val; self.edits[idx].setText(str(val)); self.link.send_angle(idx, val)
+        # Only update target. Control loop handles the move.
+        self.angles[idx] = val
+        self.edits[idx].setText(str(val))
 
-    # ---------- smooth move ----------
+    # ---------- smooth move (Sequence/UI Animation) ----------
     def smooth_move(self, target: List[int], speed_override: Optional[int] = None, on_done: Optional[callable] = None):
         if on_done: self.move_done_callbacks.append(on_done)
         if self.smooth_timer.isActive(): self.smooth_timer.stop()
         self.smooth_start = self.angles[:]
         self.smooth_target = [max(0, min(180, int(a))) for a in target]
         self.smooth_step_idx = 0
+        
+        # Adaptive resolution: At least 1 step per degree, min 20 steps
+        max_diff = 0
+        for i in range(7):
+            max_diff = max(max_diff, abs(self.smooth_target[i] - self.smooth_start[i]))
+        self.smooth_steps = max(max_diff, 20)
+        
+        # Speed calc: map slider 1..100 (fast..slow). 
+        # New delay strategy: 'val' ms per step.
+        # e.g. 30 -> 15ms/step. 100 -> 50ms/step.
         base = speed_override if speed_override is not None else self.speedSlider.value()
-        self.smooth_delay_ms = max(1, int(base/200.0*1000))   # lower = faster
+        self.smooth_delay_ms = max(3, int(base * 0.5))
+        
         self.smooth_timer.start(self.smooth_delay_ms)
 
     def _smooth_step(self):
         self.smooth_step_idx += 1
-        s = self.smooth_step_idx; steps = self.smooth_steps
+        current_step = self.smooth_step_idx; total_steps = self.smooth_steps
+        
+        # Cosine Easing (S-Curve): 1/2 * (1 - cos(pi * t))
+        # t goes from 0.0 to 1.0
+        t = current_step / total_steps
+        factor = (1 - math.cos(t * math.pi)) / 2.0
+        
         new = []
-        for i in range(6):
-            v = int(self.smooth_start[i] + (self.smooth_target[i]-self.smooth_start[i]) * s / steps)
+        for i in range(7):
+            # Interpolate
+            val = self.smooth_start[i] + (self.smooth_target[i] - self.smooth_start[i]) * factor
+            v = int(round(val))
             v = max(0, min(180, v)); new.append(v)
             self.sliders[i].blockSignals(True); self.sliders[i].setValue(v); self.sliders[i].blockSignals(False)
             self.edits[i].setText(str(v))
-        self.angles = new; self.link.send_all(new)
-        if s >= steps:
+        
+        # Update TARGETS only. Control loop will chase these targets.
+        self.angles = new
+        
+        if current_step >= total_steps:
             self.smooth_timer.stop()
             cbs = self.move_done_callbacks[:]; self.move_done_callbacks.clear()
             for cb in cbs:
@@ -567,9 +661,16 @@ class MainWindow(QtWidgets.QMainWindow):
         if not path: return
         try:
             data = json.load(open(path,"r"))
-            for k,v in data.items():
-                if not (isinstance(v,list) and len(v)==6): raise ValueError("Invalid positions file")
-            self.saved_positions.update(data)
+            valid_data = {}
+            for k, v in data.items():
+                if isinstance(v, list):
+                    if len(v) == 6:
+                        v.append(90)  # Upgrade old format
+                    if len(v) == 7:
+                        valid_data[k] = v
+            
+            if not valid_data: raise ValueError("No valid positions found (need 6 or 7 angles)")
+            self.saved_positions.update(valid_data)
             self._refresh_pos_list(); self._refresh_pos_combo()
             self._set_status(f"Imported positions from {path}", OK_GREEN)
         except Exception as e:
@@ -654,7 +755,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 if s["kind"] == "pos":
                     new.append(SeqStep(kind="pos", pos_name=s.get("pos",""), dwell_ms=int(s["dwell"]), speed=int(s["speed"])))
                 else:
-                    new.append(SeqStep(kind="angles", angles=s.get("angles",[90]*6), label=s.get("label","angles"), dwell_ms=int(s["dwell"]), speed=int(s["speed"])))
+                    arr = s.get("angles", [90]*7)
+                    if len(arr) == 6: arr.append(90)
+                    new.append(SeqStep(kind="angles", angles=arr, label=s.get("label","angles"), dwell_ms=int(s["dwell"]), speed=int(s["speed"])))
             self.sequence = new; self._rebuild_seq_table()
             self._set_status(f"Loaded sequence from {path}", OK_GREEN)
         except Exception as e:
@@ -708,7 +811,110 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def stop_all(self):
         self.stop_sequence()
+        # Force stop: set target to current to stop any drift
+        self.angles = [int(p) for p in self.current_servo_pos]
+        for i, s in enumerate(self.sliders): 
+            s.blockSignals(True); s.setValue(self.angles[i]); s.blockSignals(False)
+            self.edits[i].setText(str(self.angles[i]))
 
+    # ---------- background control loop ----------
+    def _control_loop(self):
+        # Runs at 50Hz. Moves current_servo_pos -> angles
+        if not self.link.ser or not self.link.ser.is_open: return
+        
+        # Calculate max step per frame based on speed slider
+        # Slider 1 (Fast) .. 100 (Slow)
+        # We want degrees/sec. 
+        # Say, Speed 1 = 500 deg/s. Speed 100 = 10 deg/s.
+        # This is arbitrary but needs to feel right.
+        speed_val = self.speedSlider.value()
+        # map 1..100 -> 10.0 .. 0.2 (degrees per tick)
+        # Speed 30 -> ~ 3.0 deg/tick
+        max_step = max(0.1, (101 - speed_val) * 0.15)
+
+        updated = False
+        rounded_pos = []
+        
+        for i in range(7):
+            curr = self.current_servo_pos[i]
+            targ = float(self.angles[i])
+            diff = targ - curr
+            
+            if abs(diff) > 0.05:
+                # Move towards target
+                step = diff
+                if abs(step) > max_step:
+                    step = math.copysign(max_step, diff)
+                
+                self.current_servo_pos[i] += step
+                updated = True
+            else:
+                self.current_servo_pos[i] = targ
+            
+            rounded_pos.append(int(round(self.current_servo_pos[i])))
+
+        # Send if changed (debounce slightly to avoid flood 0-change packets)
+        if updated:
+             self.link.send_all(rounded_pos)
+
+    # ---------- firmware upload ----------
+    def upload_firmware(self):
+        tool = self.arduinoPath.text().strip()
+        if not tool or not os.path.exists(tool):
+            QtWidgets.QMessageBox.critical(self, "Error", "Arduino tool not found. Please select arduino-cli.exe or arduino_debug.exe")
+            return
+            
+        board = self.boardCombo.currentText().strip()
+        port = self.portCombo.currentText().strip()
+        if not port:
+            QtWidgets.QMessageBox.critical(self, "Error", "Select a COM port first")
+            return
+
+        ino_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "firmware", "criya_firmware", "criya-v2_firmware.ino")
+        if not os.path.exists(ino_path):
+            QtWidgets.QMessageBox.critical(self, "Error", f"Firmware file not found at:\n{ino_path}")
+            return
+        
+        # Disconnect serial before upload
+        was_connected = False
+        if self.link.ser and self.link.ser.is_open:
+            self.link.disconnect()
+            was_connected = True
+
+        self._set_status("Uploading firmware… please wait", WARN_AMB)
+        QtWidgets.QApplication.processEvents()
+        
+        try:
+            # Detect tool type
+            cmd = []
+            if "arduino-cli" in os.path.basename(tool).lower():
+                # arduino-cli compile --fqbn {board} --upload -p {port} "{ino}"
+                cmd = [tool, "compile", "--fqbn", board, "--upload", "-p", port, ino_path]
+            else:
+                # Legacy: arduino_debug --upload --board {board} --port {port} "{ino}"
+                cmd = [tool, "--upload", "--board", board, "--port", port, ino_path]
+
+            # Run
+            # We use startupinfo to hide console window on Windows
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            
+            p = subprocess.run(cmd, capture_output=True, text=True, startupinfo=si)
+            
+            if p.returncode == 0:
+                QtWidgets.QMessageBox.information(self, "Success", "Firmware uploaded successfully!")
+                self._set_status("Upload complete", OK_GREEN)
+            else:
+                err = p.stderr or p.stdout
+                QtWidgets.QMessageBox.critical(self, "Upload Failed", f"Exit Code: {p.returncode}\n\n{err[-500:]}")
+                self._set_status("Upload failed", ERR_RED)
+                
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Error", str(e))
+            self._set_status(f"Error: {e}", ERR_RED)
+        
+        if was_connected:
+            self.link.connect(port, 115200)
 
 # -------------------- app bootstrap --------------------
 def apply_light_theme(app: QtWidgets.QApplication):
