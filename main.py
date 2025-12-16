@@ -1091,17 +1091,27 @@ class MainWindow(QtWidgets.QMainWindow):
         # Runs at 50Hz. Moves current_servo_pos -> angles
         if not self.link.ser or not self.link.ser.is_open: return
         
-        # Calculate max step per frame based on speed slider
-        # Slider 1 (Fast) .. 100 (Slow)
-        # We want degrees/sec. 
-        # Say, Speed 1 = 500 deg/s. Speed 100 = 10 deg/s.
-        # This is arbitrary but needs to feel right.
-        speed_val = self.speedSlider.value()
-        # map 1..100 -> 10.0 .. 0.2 (degrees per tick)
-        # Speed 30 -> ~ 3.0 deg/tick
-        max_step = max(0.1, (101 - speed_val) * 0.15)
+        # Improved Speed Scaling (Non-linear)
+        # Slider: 1-100
+        # We want fine control at low speeds.
+        # Speed 1 (Fast): ~500 deg/s ?
+        # Speed 100 (Slow): ~5 deg/s
+        
+        s = self.speedSlider.value()
+        
+        # Quadratic curve for better "slow" resolution
+        # inverse: 0 (Fast) -> 1 (Slow)
+        inv_s = (s - 1) / 99.0 
+        
+        # factor: 0.01 (Slow) -> 1.0 (Fast)
+        # Use (1 - inv_s) for "Fastness"
+        fastness = 1.0 - inv_s
+        
+        # Curve: fastness^2
+        # value range: 0.1 deg/tick to 10 deg/tick
+        max_step = 0.1 + (fastness * fastness) * 12.0
 
-        updated = False
+        updated_phys = False
         rounded_pos = []
         
         for i in range(7):
@@ -1116,15 +1126,20 @@ class MainWindow(QtWidgets.QMainWindow):
                     step = math.copysign(max_step, diff)
                 
                 self.current_servo_pos[i] += step
-                updated = True
+                updated_phys = True
             else:
                 self.current_servo_pos[i] = targ
             
             rounded_pos.append(int(round(self.current_servo_pos[i])))
 
-        # Send if changed (debounce slightly to avoid flood 0-change packets)
-        if updated:
-             self.link.send_all(rounded_pos)
+        # VITAL: Only send if the INTEGER values have actually changed 
+        # vs what was last sent to the hardware.
+        # This prevents flooding the serial line with "90, 90, 90..." 50 times a second.
+        
+        if updated_phys:
+             # Check distinct
+             if rounded_pos != self.link.last_sent:
+                 self.link.send_all(rounded_pos)
 
         # Update 3D Viz with the INTERPOLATED (Physical) position
         if self.viz:
