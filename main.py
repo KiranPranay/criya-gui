@@ -1,7 +1,11 @@
 # main.py  — PySide6 light UI, scrollable columns, corrected backgrounds & alignment
 
 from __future__ import annotations
-import sys, json, datetime, math, os, subprocess
+import sys, json, datetime, math, os, subprocess, logging
+import numpy as np
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+from mpl_toolkits.mplot3d import Axes3D
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -213,13 +217,179 @@ class SerialLink(QtCore.QObject):
             self.last_sent[i] = a
 
 
+# -------------------- Kinematics & Safety --------------------
+class Kinematics:
+    def __init__(self, config: dict):
+        self.config = config
+        # Default Link Lengths (mm) - User should configure these
+        self.L_BASE = self.config.get("link_base", 100)
+        self.L_HUMERUS = self.config.get("link_humerus", 150)
+        self.L_FOREARM = self.config.get("link_forearm", 150)
+        self.L_WRIST = self.config.get("link_wrist", 80)
+        
+    def update_lengths(self, cfg: dict):
+        self.L_BASE = float(cfg.get("link_base", self.L_BASE))
+        self.L_HUMERUS = float(cfg.get("link_humerus", self.L_HUMERUS))
+        self.L_FOREARM = float(cfg.get("link_forearm", self.L_FOREARM))
+        self.L_WRIST = float(cfg.get("link_wrist", self.L_WRIST))
+
+    def forward_kinematics(self, angles: List[float]) -> List[float]:
+        # Simple 3-link planar FK for visualization/checking (Base -> Wrist)
+        # Angles: [Grip, Wrist2, Wrist1, Elbow, Shoulder, Base_Lift, Base_Pan] ??
+        # MAPPING: 
+        # Servo 7: Base Pan (0-180, 90 center)
+        # Servo 6: Shoulder Lift (0-180, 90 up)
+        # Servo 5: Elbow Lift (0-180, 90 straight)
+        # Servo 4: Wrist Pitch
+        
+        # Convert to Radians
+        # We assume standard setup: 
+        # Base Pan (theta1): 90 is 0 deg (facing X)
+        # Shoulder (theta2): 90 is 90 deg (Vertical)
+        # Elbow (theta3): 90 is 0 deg relative to humerus
+        
+        # This is a simplification. A real robot needs DH parameters.
+        # We will use geometric approach for Viz.
+        
+        theta1 = math.radians(angles[6] - 90) # Pan
+        theta2 = math.radians(angles[5])      # Shoulder
+        theta3 = math.radians(angles[4] - 90) # Elbow relative
+        
+        # Coordinates
+        # Base (0,0,0) -> Shoulder (0,0,L_BASE)
+        # Elbow
+        x1 = 0; y1 = 0; z1 = self.L_BASE
+        
+        # Project to 2D plane rotated by theta1
+        r_elbow = self.L_HUMERUS * math.sin(theta2)
+        z_elbow = z1 + self.L_HUMERUS * math.cos(theta2)
+        x_elbow = r_elbow * math.cos(theta1)
+        y_elbow = r_elbow * math.sin(theta1)
+        
+        # Wrist
+        # Global angle of forearm = theta2 + theta3
+        theta_global = theta2 + theta3
+        r_wrist = r_elbow + self.L_FOREARM * math.sin(theta_global)
+        z_wrist = z_elbow + self.L_FOREARM * math.cos(theta_global)
+        x_wrist = r_wrist * math.cos(theta1)
+        y_wrist = r_wrist * math.sin(theta1)
+        
+        return [x_wrist, y_wrist, z_wrist]
+
+    def inverse_kinematics(self, x: float, y: float, z: float) -> Optional[List[float]]:
+        # Geometric resolution for 3-DOF (Pan, Shoulder, Elbow) to reach (x,y,z)
+        # We ignore wrist orientation for "Reach"
+        
+        # 1. Base Pan (Servo 7)
+        theta1 = math.atan2(y, x)
+        angle_base = math.degrees(theta1) + 90
+        
+        # 2. Planar problem (r, z)
+        r = math.sqrt(x*x + y*y)
+        dx = r # relative x in plane
+        dy = z - self.L_BASE # relative z from shoulder
+        
+        dist = math.sqrt(dx*dx + dy*dy)
+        
+        # Law of Cosines
+        l1 = self.L_HUMERUS
+        l2 = self.L_FOREARM
+        
+        if dist > (l1 + l2) or dist == 0:
+             return None # Unreachable
+             
+        # alpha: angle between Humerus and line-to-target
+        # beta: angle between Humerus and Forearm (Elbow)
+        
+        try:
+            alpha = math.acos( (l1*l1 + dist*dist - l2*l2) / (2 * l1 * dist) )
+            beta  = math.acos( (l1*l1 + l2*l2 - dist*dist) / (2 * l1 * l2) )
+        except ValueError:
+            return None
+            
+        # Global angle to target
+        phi = math.atan2(dx, dy) # angle from Vertical Z
+        
+        # Shoulder Angle (relative to vertical)
+        # High Elbow Solution: theta_shoulder = phi + alpha (Joints bend "back")
+        # Low Elbow Solution: theta_shoulder = phi - alpha
+        
+        # We prefer High Elbow to reduce torque? Actually "Elbow Up" usually means keeping COM closer to Z axis
+        # For this setup: 
+        theta_shoulder_rad = phi - alpha # Standard "elbow up" configuration often
+        
+        # Elbow Angle (relative to humerus)
+        theta_elbow_rad = math.pi - beta
+        
+        angle_shoulder = math.degrees(theta_shoulder_rad)
+        angle_elbow = math.degrees(theta_elbow_rad) + 90
+        
+        # Map to servos
+        # This mapping is crucial and depends on physical assembly.
+        # Assuming: 
+        # Shoulder: 0=Back, 90=Up, 180=Fwd
+        # Elbow: 0=Folded back, 90=Straight, 180=Folded in
+        
+        # Safe Output
+        return [90, 90, 90, 90, int(angle_elbow), int(angle_shoulder), int(angle_base)] # Fill others with 90
+
+# -------------------- 3D Viz --------------------
+class Viz3D(FigureCanvasQTAgg):
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        self.ax = self.fig.add_subplot(111, projection='3d')
+        super(Viz3D, self).__init__(self.fig)
+        self.setParent(parent)
+        self.kinematics = None
+
+    def update_plot(self, angles: List[float], kin: Kinematics):
+        self.ax.clear()
+        self.ax.set_xlim(-300, 300)
+        self.ax.set_ylim(-300, 300)
+        self.ax.set_zlim(0, 400)
+        self.ax.set_xlabel('X'); self.ax.set_ylabel('Y'); self.ax.set_zlabel('Z')
+        
+        # Calculate joints
+        # Base
+        x0,y0,z0 = 0,0,0
+        x1,y1,z1 = 0,0,kin.L_BASE
+        
+        theta1 = math.radians(angles[6] - 90)
+        theta2 = math.radians(angles[5]) # Shoulder input (assuming 90=Vertical)
+        theta3 = math.radians(angles[4] - 90)
+        
+        # Shoulder -> Elbow
+        # In vertical plane rotated by theta1
+        # 90 degrees shoulder = vertical
+        # 0 = horizontal back ?? Let's assume standard:
+        # vertical_angle = theta2
+        r_elbow = kin.L_HUMERUS * math.sin(theta2)
+        z_elbow = z1 + kin.L_HUMERUS * math.cos(theta2)
+        x_elbow = r_elbow * math.cos(theta1)
+        y_elbow = r_elbow * math.sin(theta1)
+        
+        # Elbow -> Wrist
+        theta_global = theta2 + theta3
+        r_wrist = r_elbow + kin.L_FOREARM * math.sin(theta_global)
+        z_wrist = z_elbow + kin.L_FOREARM * math.cos(theta_global)
+        x_wrist = r_wrist * math.cos(theta1)
+        y_wrist = r_wrist * math.sin(theta1)
+        
+        xs = [x0, x1, x_elbow, x_wrist]
+        ys = [y0, y1, y_elbow, y_wrist]
+        zs = [z0, z1, z_elbow, z_wrist]
+        
+        self.ax.plot(xs, ys, zs, 'o-', linewidth=4, markersize=8)
+        self.draw()
+
+
 # -------------------- main window --------------------
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Criya – Stack Assembly Robot (Qt)")
-        self.resize(1280, 860)
-        self.setMinimumSize(1020, 720)
+        self.resize(1400, 900)
+        self.setMinimumSize(1200, 800)
 
         # state
         self.link = SerialLink(self)
@@ -230,9 +400,9 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Config
         self.config = self.load_config()
+        self.kin = Kinematics(self.config)
         
         # Smooth Manual Control State
-        # self.angles is the TARGET (UI). self.current_servo_pos is the PHYSICAL interpolated value.
         self.current_servo_pos = [90.0]*7
         self.control_timer = QtCore.QTimer(self)
         self.control_timer.timeout.connect(self._control_loop)
@@ -272,10 +442,15 @@ class MainWindow(QtWidgets.QMainWindow):
         if os.path.exists(CONFIG_FILE):
             try: return json.load(open(CONFIG_FILE))
             except: pass
-        return {"arduino_path": r"D:\programs\arduino\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe", "board": "arduino:avr:uno"}
+        return {
+            "arduino_path": r"D:\programs\arduino\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe", 
+            "board": "arduino:avr:uno",
+            "link_base": 100, "link_humerus": 140, "link_forearm": 140, "link_wrist": 60
+        }
 
     def save_config(self):
         json.dump(self.config, open(CONFIG_FILE, "w"), indent=2)
+        if hasattr(self, 'kin'): self.kin.update_lengths(self.config)
 
     # ---------- ui ----------
     def _build_ui(self):
@@ -283,35 +458,129 @@ class MainWindow(QtWidgets.QMainWindow):
         splitter.setOrientation(QtCore.Qt.Orientation.Horizontal)
         self.setCentralWidget(splitter)
 
-        # LEFT scroll column
-        left_scroll = QtWidgets.QScrollArea(); left_scroll.setWidgetResizable(True)
-        left = QtWidgets.QWidget(); left_scroll.setWidget(left)
-        L = QtWidgets.QVBoxLayout(left); L.setContentsMargins(16,16,16,16); L.setSpacing(14)
+        # LEFT SIDE LAYOUT (Tabs)
+        left_widget = QtWidgets.QWidget()
+        left_layout = QtWidgets.QVBoxLayout(left_widget); left_layout.setContentsMargins(0,0,0,0)
+        
+        self.tabs = QtWidgets.QTabWidget()
+        self.tabs.addTab(self._tab_controls(), "Controls")
+        self.tabs.addTab(self._tab_ik(), "Inverse Kinematics")
+        self.tabs.addTab(self._tab_settings(), "Settings")
+        
+        left_layout.addWidget(self.tabs)
 
-        # RIGHT scroll column
+        # RIGHT SIDE LAYOUT (3D Viz + Servos)
         right_scroll = QtWidgets.QScrollArea(); right_scroll.setWidgetResizable(True)
         right = QtWidgets.QWidget(); right_scroll.setWidget(right)
         R = QtWidgets.QVBoxLayout(right); R.setContentsMargins(16,16,16,16); R.setSpacing(14)
+        
+        # 3D Viz
+        self.viz = Viz3D(self, width=5, height=5, dpi=100)
+        R.addWidget(self.viz)
+        R.addWidget(self._grp_servos())
+        R.addStretch(1)
 
-        splitter.addWidget(left_scroll); splitter.addWidget(right_scroll)
-        splitter.setStretchFactor(0, 2); splitter.setStretchFactor(1, 1)
-
-        # left groups
-        L.addWidget(self._grp_connection())
-        L.addWidget(self._grp_firmware())
-        L.addWidget(self._grp_speed())
-        L.addWidget(self._grp_defaults())
-        L.addWidget(self._grp_actions())
-        L.addWidget(self._grp_positions())
-        L.addWidget(self._grp_sequence())
-        L.addStretch(1)
-
-        # right group
-        R.addWidget(self._grp_servos()); R.addStretch(1)
+        splitter.addWidget(left_widget)
+        splitter.addWidget(right_scroll)
+        splitter.setStretchFactor(0, 1); splitter.setStretchFactor(1, 1)
 
         # status bar
         self.status_label = QtWidgets.QLabel("")
         self.statusBar().addWidget(self.status_label, 1)
+
+    # --- Tabs ---
+    def _tab_controls(self):
+        page = QtWidgets.QWidget()
+        L = QtWidgets.QVBoxLayout(page); L.setContentsMargins(16,16,16,16); L.setSpacing(14)
+        
+        scroll = QtWidgets.QScrollArea(); scroll.setWidgetResizable(True)
+        content = QtWidgets.QWidget(); scroll.setWidget(content)
+        v = QtWidgets.QVBoxLayout(content)
+        
+        v.addWidget(self._grp_connection())
+        v.addWidget(self._grp_firmware())
+        v.addWidget(self._grp_speed())
+        v.addWidget(self._grp_defaults())
+        v.addWidget(self._grp_actions())
+        v.addWidget(self._grp_positions())
+        v.addWidget(self._grp_sequence())
+        v.addStretch(1)
+        
+        L.addWidget(scroll)
+        return page
+
+    def _tab_ik(self):
+        page = QtWidgets.QWidget()
+        L = QtWidgets.QVBoxLayout(page); L.setContentsMargins(16,16,16,16)
+        
+        g = self._card("Cartesian Control (XYZ)")
+        form = QtWidgets.QFormLayout()
+        self.ikX = QtWidgets.QLineEdit("150")
+        self.ikY = QtWidgets.QLineEdit("0")
+        self.ikZ = QtWidgets.QLineEdit("150")
+        form.addRow("X (mm)", self.ikX)
+        form.addRow("Y (mm)", self.ikY)
+        form.addRow("Z (mm)", self.ikZ)
+        
+        btn_solve = QtWidgets.QPushButton("Move to Point")
+        btn_solve.clicked.connect(self._solve_ik)
+        
+        g.layout().addLayout(form)
+        g.layout().addWidget(btn_solve)
+        
+        L.addWidget(g)
+        L.addStretch(1)
+        return page
+
+    def _tab_settings(self):
+        page = QtWidgets.QWidget()
+        L = QtWidgets.QVBoxLayout(page); L.setContentsMargins(16,16,16,16)
+        
+        g = self._card("Robot Geometry (mm)")
+        form = QtWidgets.QFormLayout()
+        self.stBase = QtWidgets.QLineEdit(str(self.config.get("link_base", 100)))
+        self.stHum  = QtWidgets.QLineEdit(str(self.config.get("link_humerus", 140)))
+        self.stFore = QtWidgets.QLineEdit(str(self.config.get("link_forearm", 140)))
+        
+        form.addRow("Base Height (L1)", self.stBase)
+        form.addRow("Humerus (L2)", self.stHum)
+        form.addRow("Forearm (L3)", self.stFore)
+        
+        btn_save = QtWidgets.QPushButton("Save Settings")
+        btn_save.clicked.connect(self._save_settings)
+        
+        g.layout().addLayout(form)
+        g.layout().addWidget(btn_save)
+        
+        L.addWidget(g)
+        L.addStretch(1)
+        return page
+
+    # --- Actions ---
+    def _save_settings(self):
+        try:
+            self.config["link_base"] = float(self.stBase.text())
+            self.config["link_humerus"] = float(self.stHum.text())
+            self.config["link_forearm"] = float(self.stFore.text())
+            self.save_config()
+            self._set_status("Settings Saved", OK_GREEN)
+        except ValueError:
+            QtWidgets.QMessageBox.warning(self, "Invalid", "Lengths must be numbers")
+
+    def _solve_ik(self):
+        try:
+            x = float(self.ikX.text())
+            y = float(self.ikY.text())
+            z = float(self.ikZ.text())
+            
+            sol = self.kin.inverse_kinematics(x, y, z)
+            if sol:
+                self.smooth_move(sol) # Use smooth move to target
+                self._set_status(f"Moved to ({x},{y},{z})", OK_GREEN)
+            else:
+                 QtWidgets.QMessageBox.warning(self, "Unreachable", "Target out of reach")
+        except ValueError:
+             QtWidgets.QMessageBox.warning(self, "Error", "Invalid coordinates")
 
     def _card(self, title: str) -> QtWidgets.QGroupBox:
         g = QtWidgets.QGroupBox(title)
@@ -856,6 +1125,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # Send if changed (debounce slightly to avoid flood 0-change packets)
         if updated:
              self.link.send_all(rounded_pos)
+
+        # Update 3D Viz with the INTERPOLATED (Physical) position
+        if self.viz:
+             self.viz.update_plot(self.current_servo_pos, self.kin)
 
     # ---------- firmware upload ----------
     def upload_firmware(self):
