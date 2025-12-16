@@ -335,53 +335,99 @@ class Kinematics:
         # Safe Output
         return [90, 90, 90, 90, servo_elbow, servo_shoulder, servo_base] 
 
-# -------------------- 3D Viz --------------------
+# -------------------- 3D Viz (Numpy) --------------------
 class Viz3D(FigureCanvasQTAgg):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         self.ax = self.fig.add_subplot(111, projection='3d')
         super(Viz3D, self).__init__(self.fig)
         self.setParent(parent)
-        self.kinematics = None
 
     def update_plot(self, angles: List[float], kin: Kinematics):
         self.ax.clear()
         self.ax.set_xlim(-300, 300)
         self.ax.set_ylim(-300, 300)
-        self.ax.set_zlim(0, 400)
+        self.ax.set_zlim(0, 500)
         self.ax.set_xlabel('X'); self.ax.set_ylabel('Y'); self.ax.set_zlabel('Z')
         
-        # Calculate joints
-        # Base
-        x0,y0,z0 = 0,0,0
-        x1,y1,z1 = 0,0,kin.L_BASE
+        # Helper: Rotation Matrices
+        def rot_z(deg):
+            rad = np.radians(deg)
+            c, s = np.cos(rad), np.sin(rad)
+            return np.array([[c, -s, 0, 0], [s, c, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+            
+        def rot_y(deg):
+            rad = np.radians(deg)
+            c, s = np.cos(rad), np.sin(rad)
+            return np.array([[c, 0, s, 0], [0, 1, 0, 0], [-s, 0, c, 0], [0, 0, 0, 1]])
+
+        def rot_x(deg):
+            rad = np.radians(deg)
+            c, s = np.cos(rad), np.sin(rad)
+            return np.array([[1, 0, 0, 0], [0, c, -s, 0], [0, s, c, 0], [0, 0, 0, 1]])
+
+        def trans(x, y, z):
+            return np.array([[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
+
+        # 0. Origin
+        T = np.eye(4)
+        points = [T[:3, 3]]
         
-        theta1 = math.radians(angles[6] - 90)
-        theta2 = math.radians(angles[5] - 90) # Shoulder
-        theta3 = math.radians(angles[4] - 90)
+        # 1. Base (Servo 7 - Pan)
+        # Rotates around Z. 90 -> 0 deg.
+        # Height: L_BASE
+        pan_angle = angles[6] - 90
+        T = T @ rot_z(pan_angle) @ trans(0, 0, kin.L_BASE)
+        points.append(T[:3, 3])
         
-        # Shoulder -> Elbow
-        # In vertical plane rotated by theta1
-        # 90 degrees shoulder = vertical
-        # 0 = horizontal back ?? Let's assume standard:
-        # vertical_angle = theta2
-        r_elbow = kin.L_HUMERUS * math.sin(theta2)
-        z_elbow = z1 + kin.L_HUMERUS * math.cos(theta2)
-        x_elbow = r_elbow * math.cos(theta1)
-        y_elbow = r_elbow * math.sin(theta1)
+        # 2. Shoulder (Servo 6 - Pitch)
+        # Rotates around Y (local). 90 -> Up.
+        # Length: L_HUMERUS
+        shoulder_angle = angles[5] - 90
+        # Check direction: usually positive pitch leans forward or back?
+        # Let's assume + is "Back" (standard).
+        T = T @ rot_y(shoulder_angle) @ trans(0, 0, kin.L_HUMERUS)
+        points.append(T[:3, 3])
         
-        # Elbow -> Wrist
-        theta_global = theta2 + theta3
-        r_wrist = r_elbow + kin.L_FOREARM * math.sin(theta_global)
-        z_wrist = z_elbow + kin.L_FOREARM * math.cos(theta_global)
-        x_wrist = r_wrist * math.cos(theta1)
-        y_wrist = r_wrist * math.sin(theta1)
+        # 3. Elbow (Servo 5 - Pitch)
+        # Rotates around Y. 90 -> Straight.
+        # Length: L_FOREARM
+        elbow_angle = angles[4] - 90
+        T = T @ rot_y(elbow_angle) @ trans(0, 0, kin.L_FOREARM)
+        points.append(T[:3, 3]) # This is location of Servo 4
         
-        xs = [x0, x1, x_elbow, x_wrist]
-        ys = [y0, y1, y_elbow, y_wrist]
-        zs = [z0, z1, z_elbow, z_wrist]
+        # 4. Wrist Yaw (Servo 4 - Yaw)
+        # "Oscillates side by side" -> Rotates around local Z (if Z is arm axis) or X?
+        # At this point, local Z is the arm axis.
+        # So "Side to side" is Yaw -> Rotation around local Axis? 
+        # Standard: Rot around X (Roll) or Z (Yaw)? 
+        # Let's try Rot Z aka Pan relative to arm? Or Rot X?
+        # Based on image, it looks like a hinge rotating perpendicular to arm axis?
+        # Actually, if the previous joint was Y-pitch, "Side-Side" is typically X-Rotation (Roll) relative to world, but local Z relative to link?
+        # Let's assume standard Wrist Twist or Pan.
+        yaw_angle = angles[3] - 90
+        # If it's "Side by Side", and arm is horizontal (X), side-side is Y motion -> Rot around Z.
+        T = T @ rot_z(yaw_angle) @ trans(0, 0, kin.L_WRIST/2) # Half wrist length?
+        points.append(T[:3, 3])
         
-        self.ax.plot(xs, ys, zs, 'o-', linewidth=4, markersize=8)
+        # 5. Wrist Pitch (Servo 3 - Up/Down)
+        # "Head movement up and down"
+        pitch_angle = angles[2] - 90
+        T = T @ rot_y(pitch_angle) @ trans(0, 0, kin.L_WRIST/2)
+        points.append(T[:3, 3])
+        
+        # 6. Wrist Roll (Servo 2)
+        # "Rotational for gripper" -> Roll around Axis (Z local)
+        roll_angle = angles[1] - 90
+        T = T @ rot_z(roll_angle) @ trans(0, 0, 50) # Gripper length (approx 50mm)
+        points.append(T[:3, 3])
+
+        # Plot
+        pts = np.array(points)
+        self.ax.plot(pts[:,0], pts[:,1], pts[:,2], 'o-', linewidth=4, markersize=6, label='Arm')
+        
+        # Draw Base Ref
+        self.ax.plot([0,0],[0,0],[0,0], 'k^') 
         self.draw()
 
 
