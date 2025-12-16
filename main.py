@@ -251,9 +251,9 @@ class Kinematics:
         # This is a simplification. A real robot needs DH parameters.
         # We will use geometric approach for Viz.
         
-        theta1 = math.radians(angles[6] - 90) # Pan
-        theta2 = math.radians(angles[5])      # Shoulder
-        theta3 = math.radians(angles[4] - 90) # Elbow relative
+        theta1 = math.radians(angles[6] - 90) # Pan (90 -> 0 along X)
+        theta2 = math.radians(angles[5] - 90) # Shoulder (90 -> 0 Vertical Up)
+        theta3 = math.radians(angles[4] - 90) # Elbow relative (90 -> 0 Straight)
         
         # Coordinates
         # Base (0,0,0) -> Shoulder (0,0,L_BASE)
@@ -325,13 +325,15 @@ class Kinematics:
         angle_elbow = math.degrees(theta_elbow_rad) + 90
         
         # Map to servos
-        # This mapping is crucial and depends on physical assembly.
-        # Assuming: 
-        # Shoulder: 0=Back, 90=Up, 180=Fwd
-        # Elbow: 0=Folded back, 90=Straight, 180=Folded in
+        # Shoulder: 0 (Model Up) -> 90 (Servo Up)
+        # Elbow: 0 (Model Straight) -> 90 (Servo Straight)
+        
+        servo_shoulder = int(angle_shoulder + 90)
+        servo_elbow = int(angle_elbow) 
+        servo_base = int(angle_base)
         
         # Safe Output
-        return [90, 90, 90, 90, int(angle_elbow), int(angle_shoulder), int(angle_base)] # Fill others with 90
+        return [90, 90, 90, 90, servo_elbow, servo_shoulder, servo_base] 
 
 # -------------------- 3D Viz --------------------
 class Viz3D(FigureCanvasQTAgg):
@@ -355,7 +357,7 @@ class Viz3D(FigureCanvasQTAgg):
         x1,y1,z1 = 0,0,kin.L_BASE
         
         theta1 = math.radians(angles[6] - 90)
-        theta2 = math.radians(angles[5]) # Shoulder input (assuming 90=Vertical)
+        theta2 = math.radians(angles[5] - 90) # Shoulder
         theta3 = math.radians(angles[4] - 90)
         
         # Shoulder -> Elbow
@@ -1140,6 +1142,16 @@ class MainWindow(QtWidgets.QMainWindow):
              # Check distinct
              if rounded_pos != self.link.last_sent:
                  self.link.send_all(rounded_pos)
+             
+             # Updates XYZ in IK tab (Forward Kinematics)
+             # We rely on the stored config/kinematics
+             if hasattr(self, 'kin'):
+                 cur_xyz = self.kin.forward_kinematics(self.current_servo_pos)
+                 # Update texts if not currently focused (to avoid overwriting user typing? - actually user requested "supposed to change")
+                 # We'll just update them. 
+                 self.ikX.setText(f"{cur_xyz[0]:.1f}")
+                 self.ikY.setText(f"{cur_xyz[1]:.1f}")
+                 self.ikZ.setText(f"{cur_xyz[2]:.1f}")
 
         # Update 3D Viz with the INTERPOLATED (Physical) position
         if self.viz:
