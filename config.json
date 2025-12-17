@@ -2,7 +2,7 @@
   "arduino_path": "D:\\programs\\arduino\\Arduino IDE\\resources\\app\\lib\\backend\\resources\\arduino-cli.exe",
   "board": "arduino:avr:uno",
   "link_base": 120.0,
-  "link_humerus": 150.0,
+  "link_humerus": 120.0,
   "link_forearm": 75.0,
   "calib": [
     90,
@@ -12,5 +12,8 @@
     95,
     95,
     90
-  ]
+  ],
+  "link_seg1": 70.0,
+  "link_seg2": 85.0,
+  "link_seg3": 75.0
 }

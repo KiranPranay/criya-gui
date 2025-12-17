@@ -19,6 +19,45 @@ except Exception:
 
 CONFIG_FILE = "config.json"
 
+# -------------------- Matrix Helpers --------------------
+def rot_x(rad: float) -> np.ndarray:
+    c = math.cos(rad)
+    s = math.sin(rad)
+    return np.array([
+        [1, 0, 0, 0],
+        [0, c, -s, 0],
+        [0, s, c, 0],
+        [0, 0, 0, 1]
+    ])
+
+def rot_y(rad: float) -> np.ndarray:
+    c = math.cos(rad)
+    s = math.sin(rad)
+    return np.array([
+        [c, 0, s, 0],
+        [0, 1, 0, 0],
+        [-s, 0, c, 0],
+        [0, 0, 0, 1]
+    ])
+
+def rot_z(rad: float) -> np.ndarray:
+    c = math.cos(rad)
+    s = math.sin(rad)
+    return np.array([
+        [c, -s, 0, 0],
+        [s, c, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ])
+
+def trans(x: float, y: float, z: float) -> np.ndarray:
+    return np.array([
+        [1, 0, 0, x],
+        [0, 1, 0, y],
+        [0, 0, 1, z],
+        [0, 0, 0, 1]
+    ])
+
 # -------------------- serial --------------------
 try:
     import serial
@@ -212,6 +251,7 @@ class SerialLink(QtCore.QObject):
         if not self.ser or not self.ser.is_open: return
         msg = "M " + " ".join(map(str, angles)) + "\n"
         self._write_raw(msg.encode())
+        logging.info(f"TX: {msg.strip()}")
         # Update last_sent to avoid redundant individual updates immediately after
         for i, a in enumerate(angles):
             self.last_sent[i] = a
@@ -222,18 +262,34 @@ class Kinematics:
     def __init__(self, config: dict):
         self.config = config
         # Default Link Lengths (mm) - User should configure these
-        self.L_BASE = self.config.get("link_base", 100)
-        self.L_HUMERUS = self.config.get("link_humerus", 150)
-        self.L_FOREARM = self.config.get("link_forearm", 150)
-        self.L_WRIST = self.config.get("link_wrist", 80)
+        # Custom 5-Link Geometry
+        self.L_BASE = float(self.config.get("link_base", 120))      # Base Height
+        self.L_HUMERUS = float(self.config.get("link_humerus", 120)) # Shoulder to Elbow
+        
+        # Forearm Segments
+        self.L_SEG1 = float(self.config.get("link_seg1", 70))  # Elbow -> Wrist 1
+        self.L_SEG2 = float(self.config.get("link_seg2", 85))  # Wrist 1 -> Wrist 2
+        self.L_SEG3 = float(self.config.get("link_seg3", 75))  # Wrist 2 -> Tip
+        
+        # Calculated effective forearm for IK (sum of segments)
+        self.L_FOREARM = self.L_SEG1 + self.L_SEG2 + self.L_SEG3 
+        
+        # Tool Offset (Gripper)
+        self.L_TOOL = float(self.config.get("link_tool", 120))
+        
         # Calibration: Value at 90 degrees
         self.calib = self.config.get("calib", [90, 130, 110, 100, 95, 95, 90])
         
     def update_lengths(self, cfg: dict):
         self.L_BASE = float(cfg.get("link_base", self.L_BASE))
         self.L_HUMERUS = float(cfg.get("link_humerus", self.L_HUMERUS))
-        self.L_FOREARM = float(cfg.get("link_forearm", self.L_FOREARM))
-        self.L_WRIST = float(cfg.get("link_wrist", self.L_WRIST))
+        self.L_SEG1 = float(cfg.get("link_seg1", self.L_SEG1))
+        self.L_SEG2 = float(cfg.get("link_seg2", self.L_SEG2))
+        self.L_SEG3 = float(cfg.get("link_seg3", self.L_SEG3))
+        self.L_TOOL = float(cfg.get("link_tool", self.L_TOOL))
+        
+        # Recalculate sum
+        self.L_FOREARM = self.L_SEG1 + self.L_SEG2 + self.L_SEG3
         self.calib = cfg.get("calib", self.calib)
 
     def get_ideal(self, raw, idx):
@@ -245,104 +301,210 @@ class Kinematics:
         return ideal + (self.calib[idx] - 90)
 
     def forward_kinematics(self, angles: List[float]) -> List[float]:
-        # Simple 3-link planar FK for visualization/checking (Base -> Wrist)
-        # Input: IDEAL ANGLES
+        # FK using Homogenous Matrices (same as Viz3D) for accuracy with 3D rotations (Roll/Pitch)
+        # S7=Pan, S6=Pitch, S5=Pitch, S4=ROLL, S3=Pitch, S2=Roll
         
-        # CHANGED: Base Pan 90 -> 90 deg (Y Axis / Forward).
-        # This allows X to be +/- (Left/Right).
-        theta1 = math.radians(angles[6])      # Pan (90 -> 90 deg Y-axis)
-        theta2 = math.radians(angles[5] - 90) # Shoulder (90 -> 0 Vertical Up)
-        theta3 = math.radians(angles[4] - 90) # Elbow relative (90 -> 0 Straight)
+        T = np.eye(4)
         
-        # Coordinates
-        # Base (0,0,0) -> Shoulder (0,0,L_BASE)
-        # Elbow
-        x1 = 0; y1 = 0; z1 = self.L_BASE
+        # 1. Base (S7) - Pan (X-Forward)
+        theta1 = math.radians(angles[6] - 90)
+        T = T @ rot_z(theta1) @ trans(0, 0, self.L_BASE)
         
-        # Project to 2D plane rotated by theta1
-        r_elbow = self.L_HUMERUS * math.sin(theta2)
-        z_elbow = z1 + self.L_HUMERUS * math.cos(theta2)
-        x_elbow = r_elbow * math.cos(theta1)
-        y_elbow = r_elbow * math.sin(theta1)
+        # 2. Shoulder (S6) - PITCH (Rot Y)
+        # User: "<90 is Forward". 0->+90(Forward).
+        # Old: (angle - 90). 0->-90. 180->+90.
+        # New: (90 - angle). 0->+90. 180->-90.
+        theta2 = math.radians(90 - angles[5])
+        T = T @ rot_y(theta2) @ trans(0, 0, self.L_HUMERUS)
         
-        # Wrist
-        # Global angle of forearm = theta2 + theta3
-        theta_global = theta2 + theta3
-        r_wrist = r_elbow + self.L_FOREARM * math.sin(theta_global)
-        z_wrist = z_elbow + self.L_FOREARM * math.cos(theta_global)
-        x_wrist = r_wrist * math.cos(theta1)
-        y_wrist = r_wrist * math.sin(theta1)
+        # 3. Elbow (S5) - PITCH (Rot Y)
+        # User: "<90 is Forward".
+        theta3 = math.radians(90 - angles[4])
+        T = T @ rot_y(theta3) @ trans(0, 0, self.L_SEG1)
         
-        return [x_wrist, y_wrist, z_wrist]
+        # 4. Wrist 1 (S4) - LATERAL BEND (Rot X)
+        # User: "Servo 4 in y direction" -> Y-Motion = Lateral = Rot X.
+        theta4 = math.radians(angles[3] - 90)
+        T = T @ rot_x(theta4) @ trans(0, 0, self.L_SEG2) 
+        
+        # 5. Wrist 2 (S3) - PITCH (Rot Y)
+        # User: "<90 is Forward".
+        theta5 = math.radians(90 - angles[2])
+        T = T @ rot_y(theta5) @ trans(0, 0, self.L_SEG3)
+        
+        # 6. Wrist 3 (S2) - ROLL (Rot X / Parallel to Tool)
+        # User: "Servo 2 motion is okay" (Roll along X).
+        theta6 = math.radians(angles[1] - 90)
+        T = T @ rot_x(theta6)
+        
+        # 7. Tool Offset (Fixed)
+        # Forward (X).
+        T = T @ trans(self.L_TOOL, 0, 0)
+        
+        # 8. S1 (Tip) - Removed Visualization request.
+        # Just return current Tool Tip position.
+        return list(T[:3, 3])
 
     def inverse_kinematics(self, x: float, y: float, z: float) -> Optional[List[float]]:
-        # Geometric resolution for 3-DOF (Pan, Shoulder, Elbow) to reach (x,y,z)
-        # We ignore wrist orientation for "Reach"
+        # Geometric resolution for 3-DOF (Pan, Shoulder, Elbow)
+        # Supports "Leaning Back" (Negative Radius) if target is behind the Y axis.
         
-        # 1. Base Pan (Servo 7)
-        theta1 = math.atan2(y, x)
-        angle_base = math.degrees(theta1) 
-        # No +90 offset because now Servo 90 = 90 deg (Y axis).
-        # atan2(y,x) gives angle from X.
-        # If target (0, 100) -> 90 deg -> Servo 90.
-        # If target (100, 0) -> 0 deg  -> Servo 0.
-        # If target (-100,0) -> 180 deg -> Servo 180.
+        candidates = []
         
-        # 2. Planar problem (r, z)
-        r = math.sqrt(x*x + y*y)
-        dx = r # relative x in plane
-        dy = z - self.L_BASE # relative z from shoulder
+        # Strategy 1: Forward Reach (r > 0)
+        theta1_a = math.atan2(y, x)
+        angle_base_a = math.degrees(theta1_a) + 90 # Map -90..90 to 0..180
+        r_total_a = math.sqrt(x*x + y*y)
+        # Wrist Target = Target - Tool
+        r_wrist_a = r_total_a - self.L_TOOL 
+        candidates.append((angle_base_a, r_wrist_a))
         
-        dist = math.sqrt(dx*dx + dy*dy)
+        # Strategy 2: Backward Reach (r < 0, Base flipped 180)
+        theta1_b = theta1_a + math.pi # Flip 180
+        # Normalize to -PI..PI
+        theta1_b = math.atan2(math.sin(theta1_b), math.cos(theta1_b))
+        angle_base_b = math.degrees(theta1_b) + 90 # Map to servo
         
-        # Law of Cosines
-        l1 = self.L_HUMERUS
-        l2 = self.L_FOREARM
+        # For backward reach, the tool also points backward relative to base?
+        # If Base rotates 180, Forward is now "Back".
+        # So Tool points "Back" relative to world.
+        # So we want Wrist to be FURTHER away? 
+        # r_total (negative sign) = r_wrist + L_TOOL?
+        # Wait, r is radial distance from Z axis.
+        # If Target is at Y = -100. r_target = 100.
+        # We point base at -90 (South).
+        # Tool points South.
+        # So Wrist must be at 100 - 120 = -20 (Behind Z axis in the frame)?
+        # Yes.
+        r_wrist_b = -r_total_a - self.L_TOOL # ??? 
+        # Let's check:
+        # If Target Y=-100. Target R=100. Base Angle turns to -90.
+        # In frame -90: Target is at +100.
+        # Tool is +120. 
+        # Wrist needs to be at 100 - 120 = -20.
+        # So we pass -20 to Planar Solver.
+        # Planar Solver treats -20 as "Leaning Back".
+        # Yes.
+        candidates.append((angle_base_b, r_total_a - self.L_TOOL)) 
+        # WRONG. In Strategy 2 (Flipped), The Base points AWAY from target.
+        # Target -100. Base +90 (North). 
+        # Target is at -100 in Base Frame.
+        # Tool is +120 in Base Frame? No, Tool rotates with Base. 
+        # So Tool is +120 (North). 
+        # We want Reach + Tool = -100? No.
+        # Reach + 120 = -100 -> Reach = -220.
         
-        if dist > (l1 + l2) or dist == 0:
-             return None # Unreachable
-             
-        # alpha: angle between Humerus and line-to-target
-        # beta: angle between Humerus and Forearm (Elbow)
+        # Let's simplify Strategy 2:
+        # Turn Base to Target. (Strategy 1).
+        # Then try to reach with Negative R. 
+        # If R_wrist_a < 0, that IS strategy 2 naturally?
         
-        try:
-            alpha = math.acos( (l1*l1 + dist*dist - l2*l2) / (2 * l1 * dist) )
-            beta  = math.acos( (l1*l1 + l2*l2 - dist*dist) / (2 * l1 * l2) )
-        except ValueError:
-            return None
+        # Actually, let's just stick to Strategy 1 (Turn to Target).
+        # And allow r_wrist to be negative.
+        # If r_wrist is -20, the planar solver handles it.
+        # We don't need explicit Flip of base if "Leaning Back" covers it.
+        
+        # The only reason to Flip Base is if Servo 7 limits prevent turning to target.
+        # But for 0-180 limits (Forward Only), we MUST Flip Base if Target Y < 0.
+        
+        # Case A: Target Y > 0. Base ~ 90. Tool Points Forward (Y+).
+        # r_total = sqrt. r_wrist = r_total - Tool.
+        
+        # Case B: Target Y < 0. Base ~ 270 (-90). 
+        # Servo 7 cannot go to -90.
+        # We MUST use Base 90 (Face Forward) and Reach BACK (Negative R).
+        # Tool Points Forward (Y+).
+        # Target is Behind (-Y).
+        # Wrist + Tool = Target.
+        # Wrist + 120 = -100.
+        # Wrist = -220.
+        # Planar Solver needs to reach -220.
+        
+        # So:
+        # If Base cannot face target (Y < 0), we face Forward/Nearest.
+        # And solve for r_wrist.
+        
+        theta_target = math.atan2(y, x)
+        angle_target = math.degrees(theta_target)
+        
+        final_candidates = []
+        
+        # Option 1: Face Target
+        angle_1 = angle_target
+        r_1 = math.sqrt(x*x + y*y)
+        r_w1 = r_1 - self.L_TOOL
+        final_candidates.append((angle_1, r_w1))
+        
+        # Option 2: Face Opposite
+        angle_2 = angle_target + 180
+        angle_2_norm = (angle_2 + 180) % 360 - 180
+        r_2 = -r_1 # Target is "Behind"
+        # Tool is "Forward" relative to base.
+        # So Reach (Wrist) + Tool = Target (Negative).
+        # Wrist + 120 = -r
+        # Wrist = -r - 120.
+        r_w2 = -r_1 - self.L_TOOL
+        final_candidates.append((angle_2_norm, r_w2))
+        
+        for (angle_base, r_plane) in final_candidates:
+            # Check Base Limit (0 to 180)
+            if not (0 <= angle_base <= 180):
+                continue
+                
+            # Solve planar (r_plane, z)
+            dx = r_plane
+            dy = z - self.L_BASE
             
-        # Global angle to target
-        phi = math.atan2(dx, dy) # angle from Vertical Z
+            # Law of Cosines
+            l1 = self.L_HUMERUS
+            l2 = self.L_FOREARM
+            dist = math.sqrt(dx*dx + dy*dy)
+            
+            if dist > (l1 + l2) or dist == 0:
+                 # Unreachable in this config
+                 continue
+            
+            # alpha: angle between Humerus and line-to-target
+            try:
+                alpha = math.acos((l1*l1 + dist*dist - l2*l2) / (2 * l1 * dist))
+                # beta: angle between Humerus and Forearm
+                beta = math.acos((l1*l1 + l2*l2 - dist*dist) / (2 * l1 * l2))
+            except ValueError:
+                continue
+
+            # gamma: angle of line-to-target vs horizon
+            gamma = math.atan2(dy, dx)
+            
+            # Shoulder Angle (relative to horizon)
+            theta_shoulder_rad = gamma + alpha # Elbow UP solution
+            
+            # Elbow Angle (relative to humerus)
+            theta_elbow_rad = math.pi - beta
+            
+            angle_shoulder = math.degrees(theta_shoulder_rad)
+            angle_elbow = math.degrees(theta_elbow_rad) + 90
+            
+            # Map to servos
+            # Geometry: Gamma(0)=Forward Horizon. Gamma(90)=Up. Gamma(180)=Back Horizon.
+            # Servo: 180=Forward, 90=Up, 0=Back.
+            # Relation: Servo = 180 - Geometry.
+            
+            ideal_base = angle_base
+            ideal_shoulder = 180 - angle_shoulder
+            ideal_elbow = angle_elbow
+            
+            # Check limits (Ideal 0-180)
+            if (0 <= ideal_shoulder <= 180) and (0 <= ideal_elbow <= 180):
+                 # Valid Solution Found!
+                 out = [90]*7
+                 out[6] = int(ideal_base)
+                 out[5] = int(ideal_shoulder)
+                 out[4] = int(ideal_elbow)
+                 return out
         
-        # Shoulder Angle (relative to vertical)
-        # High Elbow Solution: theta_shoulder = phi + alpha (Joints bend "back")
-        # Low Elbow Solution: theta_shoulder = phi - alpha
-        
-        # We prefer High Elbow to reduce torque? Actually "Elbow Up" usually means keeping COM closer to Z axis
-        # For this setup: 
-        theta_shoulder_rad = phi - alpha # Standard "elbow up" configuration often
-        
-        # Elbow Angle (relative to humerus)
-        theta_elbow_rad = math.pi - beta
-        
-        angle_shoulder = math.degrees(theta_shoulder_rad)
-        angle_elbow = math.degrees(theta_elbow_rad) + 90
-        
-        # Map to servos
-        # Shoulder: 0 (Model Up) -> 90 (Ideal Up)
-        # Elbow: 0 (Model Straight) -> 90 (Ideal Str)
-        
-        ideal_base = angle_base
-        ideal_shoulder = angle_shoulder + 90
-        ideal_elbow = angle_elbow
-        
-        # Return IDEAL angles. conversion to RAW happens in Control Loop.
-        out = [90]*7
-        out[6] = int(ideal_base)
-        out[5] = int(ideal_shoulder)
-        out[4] = int(ideal_elbow)
-        
-        return out
+        # If no solution found
+        logging.warning(f"IK Fail: No valid config for ({x},{y},{z})")
+        return None
 
 # -------------------- 3D Viz (Numpy) --------------------
 class Viz3D(FigureCanvasQTAgg):
@@ -386,52 +548,121 @@ class Viz3D(FigureCanvasQTAgg):
         
         # 1. Base (Servo 7 - Pan)
         # Rotates around Z. 90 -> 90 deg (Y axis).
-        # Height: L_BASE
-        pan_angle = ideal_angles[6]
+        # CHANGED: 90 -> 0 deg (X axis/Forward).
+        # Height: L_BASE (120)
+        pan_angle = ideal_angles[6] - 90
         T = T @ rot_z(pan_angle) @ trans(0, 0, kin.L_BASE)
         points.append(T[:3, 3])
         
-        # 2. Shoulder (Servo 6 - Pitch)
-        # Rotates around Y (local). 90 -> Up.
-        # Length: L_HUMERUS
-        shoulder_angle = ideal_angles[5] - 90
-        # Check direction: usually positive pitch leans forward or back?
-        # Let's assume + is "Back" (standard).
+        # 2. Shoulder (Servo 6 - PITCH / Rot Y)
+        # Inverted: 90 - Angle
+        shoulder_angle = 90 - ideal_angles[5]
         T = T @ rot_y(shoulder_angle) @ trans(0, 0, kin.L_HUMERUS)
         points.append(T[:3, 3])
         
-        # 3. Elbow (Servo 5 - Pitch)
-        # Rotates around Y. 90 -> Straight.
-        # Length: L_FOREARM
-        elbow_angle = ideal_angles[4] - 90
-        T = T @ rot_y(elbow_angle) @ trans(0, 0, kin.L_FOREARM)
-        points.append(T[:3, 3]) # This is location of Servo 4
+        # 3. Elbow (Servo 5 - PITCH / Rot Y)
+        elbow_angle = 90 - ideal_angles[4]
+        T = T @ rot_y(elbow_angle) @ trans(0, 0, kin.L_SEG1)
+        points.append(T[:3, 3]) 
         
-        # 4. Wrist Yaw (Servo 4 - Yaw)
-        # "Oscillates side by side" -> Rotates around local Z (if Z is arm axis) or X?
-        # At this point, local Z is the arm axis.
-        # So "Side to side" is Yaw -> Rotation around local Axis? 
-        # Standard: Rot around X (Roll) or Z (Yaw)? 
-        # Let's try Rot Z aka Pan relative to arm? Or Rot X?
-        # Based on image, it looks like a hinge rotating perpendicular to arm axis?
-        # Actually, if the previous joint was Y-pitch, "Side-Side" is typically X-Rotation (Roll) relative to world, but local Z relative to link?
-        # Let's assume standard Wrist Twist or Pan.
-        yaw_angle = ideal_angles[3] - 90
-        # If it's "Side by Side", and arm is horizontal (X), side-side is Y motion -> Rot around Z.
-        T = T @ rot_z(yaw_angle) @ trans(0, 0, kin.L_WRIST/2) # Half wrist length?
+        # 4. Wrist 1 (Servo 4 - LATERAL / Rot X)
+        w1_angle = ideal_angles[3] - 90
+        T = T @ rot_x(w1_angle) @ trans(0, 0, kin.L_SEG2)
         points.append(T[:3, 3])
         
-        # 5. Wrist Pitch (Servo 3 - Up/Down)
-        # "Head movement up and down"
-        pitch_angle = ideal_angles[2] - 90
-        T = T @ rot_y(pitch_angle) @ trans(0, 0, kin.L_WRIST/2)
+        # 5. Wrist 2 (Servo 3 - PITCH / Rot Y)
+        w2_angle = 90 - ideal_angles[2]
+        T = T @ rot_y(w2_angle) @ trans(0, 0, kin.L_SEG3)
         points.append(T[:3, 3])
         
-        # 6. Wrist Roll (Servo 2)
-        # "Rotational for gripper" -> Roll around Axis (Z local)
-        roll_angle = ideal_angles[1] - 90
-        T = T @ rot_z(roll_angle) @ trans(0, 0, 50) # Gripper length (approx 50mm)
-        T = T @ rot_z(roll_angle) @ trans(0, 0, 50) # Gripper length (approx 50mm)
+        # 6. Wrist 3 (Servo 2 - Link/Gripper Base)
+        # Rot X (Tool Roll).
+        w3_angle = ideal_angles[1] - 90
+        T = T @ rot_x(w3_angle) @ trans(0, 0, 0) 
+        # No point append here (Same pos as S3 end).
+        
+        # 7. TOOL TIP (Fixed Offset)
+        # X-Direction (Forward).
+        T = T @ trans(kin.L_TOOL, 0, 0)
+        points.append(T[:3, 3])
+        
+        # 8. S1 removed from Visualization.
+        
+        # Plot the Robot Arm Structure
+        pts = np.array(points)
+        print(f"DEBUG: Viz Points: {len(pts)}")
+        
+        # Draw Line (Skeleton) all the way to Tip
+        self.ax.plot(pts[:, 0], pts[:, 1], pts[:, 2], '-', linewidth=4, color='tab:blue')
+        
+        # Draw Markers (Joints) stopping before the Tip (remove last point)
+        self.ax.plot(pts[:-1, 0], pts[:-1, 1], pts[:-1, 2], 'o', markersize=6, color='tab:blue') 
+        
+        # Plot Orientation Triad at the Tip
+        R = T[:3, :3]
+        P = T[:3, 3]
+        scale = 40 
+        
+        # X-Axis (Red)
+        px = P + R @ np.array([scale, 0, 0])
+        self.ax.plot([P[0], px[0]], [P[1], px[1]], [P[2], px[2]], 'r-', linewidth=2)
+        
+        # Y-Axis (Green)
+        py = P + R @ np.array([0, scale, 0])
+        self.ax.plot([P[0], py[0]], [P[1], py[1]], [P[2], py[2]], 'g-', linewidth=2)
+        
+        # Z-Axis (Blue)
+        pz = P + R @ np.array([0, 0, scale])
+        self.ax.plot([P[0], pz[0]], [P[1], pz[1]], [P[2], pz[2]], 'b-', linewidth=2)
+        
+        # S1 Viz Removed.
+        # If we stick a tool "Perpendicular" to the last segment?
+        # The user says "impace X by 120".
+        # If Arm is Up. Tool is X=120.
+        # My Viz chain: Pan (Z) -> Pitch (Y). Forward is ... Y-axis world?
+        # If Pitch=0. Local Z is Up. 
+        # A Perpendicular Tool would be in Local Y (Forward) or X (Right)?
+        # Let's assume Local X (which corresponds to World Y if Pan=0? No).
+        # Let's align with the Base Radial direction.
+        # If Base Angle = 90 (Y-axis). Tool should be Y direction.
+        # Our FK code adds L_TOOL to 'r'.
+        # 'r' is the "horizontal projection".
+        # So Tool is effectively lengthening the Reach in the Plane of the arm.
+        # In Viz: If arm bends, L_TOOL should bend with it?
+        # Or is L_TOOL fixed to Servo 2?
+        # "Impacting X by 120" usually means radial reach.
+        # So it's effectively an extension along the gripper axis.
+        # If S2 is Roll, and Gripper is attached to S2.
+        # Let's draw it along Local Z? No that would be inline.
+        # Let's draw it perpendicular... 
+        # But math says r += 120. That means it acts like an extension of the arm reach, but 
+        # "Tip is out of straight line" suggests it's NOT linear.
+        # It's an OFFSET. 
+        # But if it always adds 120 to Reach, it acts like a horizontal bar at the end.
+        # Let's assume it's a horizontal offset relative to the *Ground* (parallel to XY)? 
+        # OR perpendicular to the last link? 
+        # Re-reading: "From (0,0,0) to tip... perpendicular distance is 120".
+        # This implies horizontal distance from vertical axis.
+        # If arm is vertical. Tip is at 120 horizontally.
+        # If arm is horizontal. Tip is at 120.... from what?
+        # If it adds to Reach, it implies it's ALONG the arm direction?
+        # NO. "Tip is out of straight line".
+        # This means L-shape.
+        # If Arm is Up (Z), Tool is Sideways (Y or X).
+        # If Arm is Forward (Y), Tool is Down (-Z)? Or Sideways (X)?
+        # User: "Impacting X by 120" (when upright?).
+        # I will assume it's a Right-Angle bracket.
+        # And it points "Forward" relative to the arm plane?
+        # Viz: Draw a line in Local Y? (If Local Z is arm axis).
+        # Actually... if FK logic `r += L_TOOL`, this implicitly models it as a Horizontal Extension *Parallel to Ground*?
+        # No, `r += L_TOOL` in my FK code treats it as `r` (Projected) + Offset.
+        # If the offset is physically attached to the last link (S2), it rotates with S2.
+        # If S2 is Up (90), Tool is Horizontal.
+        # If S2 is Forward (0), Tool is Vertical Down? 
+        # If it's vertical down, it does NOT add to reach.
+        # BUT User IK Request implies they want to control value.
+        # I will Model it in Viz as a green line 120mm "Sideways" from wrist.
+        T = T @ trans(0, kin.L_TOOL, 0) # Try Local Y
         points.append(T[:3, 3])
 
         # Plot
@@ -508,7 +739,10 @@ class MainWindow(QtWidgets.QMainWindow):
         return {
             "arduino_path": r"D:\programs\arduino\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe", 
             "board": "arduino:avr:uno",
-            "link_base": 100, "link_humerus": 140, "link_forearm": 140, "link_wrist": 60,
+            "link_base": 120, "link_humerus": 120, 
+            "link_base": 120, "link_humerus": 120, 
+            "link_seg1": 70, "link_seg2": 85, "link_seg3": 75,
+            "link_tool": 120,
             "calib": [90, 130, 110, 100, 95, 95, 90]
         }
 
@@ -575,25 +809,44 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _tab_ik(self):
         page = QtWidgets.QWidget()
-        L = QtWidgets.QVBoxLayout(page); L.setContentsMargins(16,16,16,16)
+         # Form
+        layout = QtWidgets.QVBoxLayout(page)
         
-        g = self._card("Cartesian Control (XYZ)")
-        form = QtWidgets.QFormLayout()
-        self.ikX = QtWidgets.QLineEdit("150")
-        self.ikY = QtWidgets.QLineEdit("0")
-        self.ikZ = QtWidgets.QLineEdit("150")
-        form.addRow("X (mm)", self.ikX)
-        form.addRow("Y (mm)", self.ikY)
-        form.addRow("Z (mm)", self.ikZ)
+        box = QtWidgets.QGroupBox("Cartesian Control (XYZ)")
+        form = QtWidgets.QGridLayout()
         
-        btn_solve = QtWidgets.QPushButton("Move to Point")
-        btn_solve.clicked.connect(self._solve_ik)
+        self.ikX = QtWidgets.QLineEdit("0.0")
+        self.ikY = QtWidgets.QLineEdit("0.0")
+        self.ikZ = QtWidgets.QLineEdit("470.0") # Default HOME
         
-        g.layout().addLayout(form)
-        g.layout().addWidget(btn_solve)
+        # Checkboxes for "Active" (If unchecked, treat as Optional/Hold Current)
+        self.chkX = QtWidgets.QCheckBox("Use")
+        self.chkY = QtWidgets.QCheckBox("Use")
+        self.chkZ = QtWidgets.QCheckBox("Use")
+        self.chkX.setChecked(True)
+        self.chkY.setChecked(True)
+        self.chkZ.setChecked(True)
         
-        L.addWidget(g)
-        L.addStretch(1)
+        form.addWidget(QtWidgets.QLabel("X (mm)"), 0, 0)
+        form.addWidget(self.ikX, 0, 1)
+        form.addWidget(self.chkX, 0, 2)
+        
+        form.addWidget(QtWidgets.QLabel("Y (mm)"), 1, 0)
+        form.addWidget(self.ikY, 1, 1)
+        form.addWidget(self.chkY, 1, 2)
+        
+        form.addWidget(QtWidgets.QLabel("Z (mm)"), 2, 0)
+        form.addWidget(self.ikZ, 2, 1)
+        form.addWidget(self.chkZ, 2, 2)
+        
+        btn_go = QtWidgets.QPushButton("Move to Point")
+        btn_go.clicked.connect(self._solve_ik)
+        
+        form.addWidget(btn_go, 3, 0, 1, 3)
+        
+        box.setLayout(form)
+        layout.addWidget(box)
+        layout.addStretch(1)
         return page
 
     def _tab_settings(self):
@@ -602,13 +855,26 @@ class MainWindow(QtWidgets.QMainWindow):
         
         g = self._card("Robot Geometry (mm)")
         form = QtWidgets.QFormLayout()
-        self.stBase = QtWidgets.QLineEdit(str(self.config.get("link_base", 100)))
-        self.stHum  = QtWidgets.QLineEdit(str(self.config.get("link_humerus", 140)))
-        self.stFore = QtWidgets.QLineEdit(str(self.config.get("link_forearm", 140)))
+        
+        self.stBase = QtWidgets.QLineEdit(str(self.config.get("link_base", 120)))
+        self.stHum  = QtWidgets.QLineEdit(str(self.config.get("link_humerus", 120)))
+        
+        self.stSeg1 = QtWidgets.QLineEdit(str(self.config.get("link_seg1", 70)))
+        self.stSeg2 = QtWidgets.QLineEdit(str(self.config.get("link_seg2", 85)))
+        self.stSeg3 = QtWidgets.QLineEdit(str(self.config.get("link_seg3", 75)))
+        self.stTool = QtWidgets.QLineEdit(str(self.config.get("link_tool", 120)))
         
         form.addRow("Base Height (L1)", self.stBase)
-        form.addRow("Humerus (L2)", self.stHum)
-        form.addRow("Forearm (L3)", self.stFore)
+        form.addRow("Shoulder->Elbow (L2)", self.stHum)
+        form.addRow("Elbow->Wrist1 (S1)", self.stSeg1)
+        form.addRow("Wrist1->Wrist2 (S2)", self.stSeg2)
+        form.addRow("Link 3 (S3)", self.stSeg3)
+        form.addRow("Gripper Offset (Tool)", self.stTool)
+        form.addRow("Base Height (L1)", self.stBase)
+        form.addRow("Shoulder->Elbow (L2)", self.stHum)
+        form.addRow("Elbow->Wrist1 (S1)", self.stSeg1)
+        form.addRow("Wrist1->Wrist2 (S2)", self.stSeg2)
+        form.addRow("Link 3 (Gripper Tip)", self.stSeg3)
 
         g2 = self._card("Calibration (Val at 90°)")
         form2 = QtWidgets.QFormLayout()
@@ -639,7 +905,11 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             self.config["link_base"] = float(self.stBase.text())
             self.config["link_humerus"] = float(self.stHum.text())
-            self.config["link_forearm"] = float(self.stFore.text())
+            
+            self.config["link_seg1"] = float(self.stSeg1.text())
+            self.config["link_seg2"] = float(self.stSeg2.text())
+            self.config["link_seg3"] = float(self.stSeg3.text())
+            self.config["link_tool"] = float(self.stTool.text())
             
             # Save Calib
             # calibEdits: [S1, S2, S3, S4, S5, S6, S7] (Now ascending)
@@ -656,16 +926,39 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _solve_ik(self):
         try:
-            x = float(self.ikX.text())
-            y = float(self.ikY.text())
-            z = float(self.ikZ.text())
+            # Determine Targets
+            # If Checked -> Use Field
+            # If Unchecked -> Use Current Robot Position (Partial IK)
+            
+            # Get current position first (for defaults)
+            cur_pos = [0,0,0]
+            if hasattr(self, 'kin') and hasattr(self, 'current_servo_pos'):
+                 # Need IDEAL angles for FK
+                 # current_servo_pos are RAW. 
+                 # FK in Kinematics expects IDEAL (if my recent change was correct).
+                 # Wait, let's check `_control_loop`:
+                 # cur_xyz = self.kin.forward_kinematics(rounded_pos) 
+                 # and `rounded_pos` WAS converted to Ideal logic?
+                 # No, `rounded_pos` in `_control_loop` comes from sliders which ARE Ideal now.
+                 # So yes, `self.current_servo_pos` (which isn't strictly tracked, `self.angles` is)
+                 # `self.angles` stores the Slider values (Ideal).
+                 
+                 cur_pos = self.kin.forward_kinematics(self.angles)
+
+            x = float(self.ikX.text()) if self.chkX.isChecked() else cur_pos[0]
+            y = float(self.ikY.text()) if self.chkY.isChecked() else cur_pos[1]
+            z = float(self.ikZ.text()) if self.chkZ.isChecked() else cur_pos[2]
+            
+            logging.info(f"IK Request: X={x}, Y={y}, Z={z} (Flags: {self.chkX.isChecked()},{self.chkY.isChecked()},{self.chkZ.isChecked()})")
             
             sol = self.kin.inverse_kinematics(x, y, z)
             if sol:
+                logging.info(f"IK Success: {sol}")
                 self.smooth_move(sol) # Use smooth move to target
                 self._set_status(f"Moved to ({x},{y},{z})", OK_GREEN)
             else:
-                 QtWidgets.QMessageBox.warning(self, "Unreachable", "Target out of reach")
+                logging.warning(f"IK Failed: Unreachable ({x}, {y}, {z})")
+                QtWidgets.QMessageBox.warning(self, "Unreachable", "Target out of reach")
         except ValueError:
              QtWidgets.QMessageBox.warning(self, "Error", "Invalid coordinates")
 
@@ -1226,8 +1519,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if updated_phys:
              # Convert IDEAL (rounded_pos) to RAW/PHYSICAL
              if hasattr(self, 'kin'):
-                 raw_pos = [self.kin.get_raw(p, i) for i, p in enumerate(rounded_pos)]
-                 raw_pos = [int(max(0, min(180, x))) for x in raw_pos] # Clamp Check
+                 raw_pos = []
+                 for i, p in enumerate(rounded_pos):
+                     val = self.kin.get_raw(p, i)
+                     clamped = int(max(0, min(180, val)))
+                     if abs(val - clamped) > 1:
+                         logging.warning(f"Servo {i+1} Clamped: {int(val)} -> {clamped}")
+                     raw_pos.append(clamped)
              else:
                  raw_pos = rounded_pos
 
@@ -1334,4 +1632,36 @@ def main():
     sys.exit(app.exec())
 
 if __name__ == "__main__":
-    main()
+    # Setup Logging to botlog.txt
+    logging.basicConfig(
+        filename="botlog.txt",
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        filemode='a' # Overwrite each run? Or 'a' append. User said "logs of whats happening". 'a' is safer for history, 'w' cleaner. Let's use 'w' for now or 'a'. 'a' is better.
+    )
+    logging.info("=== Application Started ===")
+    
+    app = QtWidgets.QApplication(sys.argv)
+    
+    # Palette/Style setup (existing)
+    app.setStyle("Fusion")
+    palette = QtGui.QPalette()
+    # ... (rest of palette)
+    palette.setColor(QtGui.QPalette.Window, QtGui.QColor(240, 240, 240))
+    palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.black)
+    palette.setColor(QtGui.QPalette.Base, QtGui.QColor(255, 255, 255))
+    palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(245, 245, 245))
+    palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
+    palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.black)
+    palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
+    palette.setColor(QtGui.QPalette.Button, QtGui.QColor(240, 240, 240))
+    palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.black)
+    palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
+    palette.setColor(QtGui.QPalette.Link, QtGui.QColor(42, 130, 218))
+    palette.setColor(QtGui.QPalette.Highlight, QtGui.QColor(42, 130, 218))
+    palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.white)
+    app.setPalette(palette)
+
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
