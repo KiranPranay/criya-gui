@@ -226,32 +226,31 @@ class Kinematics:
         self.L_HUMERUS = self.config.get("link_humerus", 150)
         self.L_FOREARM = self.config.get("link_forearm", 150)
         self.L_WRIST = self.config.get("link_wrist", 80)
+        # Calibration: Value at 90 degrees
+        self.calib = self.config.get("calib", [90, 130, 110, 100, 95, 95, 90])
         
     def update_lengths(self, cfg: dict):
         self.L_BASE = float(cfg.get("link_base", self.L_BASE))
         self.L_HUMERUS = float(cfg.get("link_humerus", self.L_HUMERUS))
         self.L_FOREARM = float(cfg.get("link_forearm", self.L_FOREARM))
         self.L_WRIST = float(cfg.get("link_wrist", self.L_WRIST))
+        self.calib = cfg.get("calib", self.calib)
+
+    def get_ideal(self, raw, idx):
+        # raw - (calib - 90)
+        return raw - (self.calib[idx] - 90)
+
+    def get_raw(self, ideal, idx):
+        # ideal + (calib - 90)
+        return ideal + (self.calib[idx] - 90)
 
     def forward_kinematics(self, angles: List[float]) -> List[float]:
         # Simple 3-link planar FK for visualization/checking (Base -> Wrist)
-        # Angles: [Grip, Wrist2, Wrist1, Elbow, Shoulder, Base_Lift, Base_Pan] ??
-        # MAPPING: 
-        # Servo 7: Base Pan (0-180, 90 center)
-        # Servo 6: Shoulder Lift (0-180, 90 up)
-        # Servo 5: Elbow Lift (0-180, 90 straight)
-        # Servo 4: Wrist Pitch
+        # Input: IDEAL ANGLES
         
-        # Convert to Radians
-        # We assume standard setup: 
-        # Base Pan (theta1): 90 is 0 deg (facing X)
-        # Shoulder (theta2): 90 is 90 deg (Vertical)
-        # Elbow (theta3): 90 is 0 deg relative to humerus
-        
-        # This is a simplification. A real robot needs DH parameters.
-        # We will use geometric approach for Viz.
-        
-        theta1 = math.radians(angles[6] - 90) # Pan (90 -> 0 along X)
+        # CHANGED: Base Pan 90 -> 90 deg (Y Axis / Forward).
+        # This allows X to be +/- (Left/Right).
+        theta1 = math.radians(angles[6])      # Pan (90 -> 90 deg Y-axis)
         theta2 = math.radians(angles[5] - 90) # Shoulder (90 -> 0 Vertical Up)
         theta3 = math.radians(angles[4] - 90) # Elbow relative (90 -> 0 Straight)
         
@@ -282,7 +281,12 @@ class Kinematics:
         
         # 1. Base Pan (Servo 7)
         theta1 = math.atan2(y, x)
-        angle_base = math.degrees(theta1) + 90
+        angle_base = math.degrees(theta1) 
+        # No +90 offset because now Servo 90 = 90 deg (Y axis).
+        # atan2(y,x) gives angle from X.
+        # If target (0, 100) -> 90 deg -> Servo 90.
+        # If target (100, 0) -> 0 deg  -> Servo 0.
+        # If target (-100,0) -> 180 deg -> Servo 180.
         
         # 2. Planar problem (r, z)
         r = math.sqrt(x*x + y*y)
@@ -325,15 +329,20 @@ class Kinematics:
         angle_elbow = math.degrees(theta_elbow_rad) + 90
         
         # Map to servos
-        # Shoulder: 0 (Model Up) -> 90 (Servo Up)
-        # Elbow: 0 (Model Straight) -> 90 (Servo Straight)
+        # Shoulder: 0 (Model Up) -> 90 (Ideal Up)
+        # Elbow: 0 (Model Straight) -> 90 (Ideal Str)
         
-        servo_shoulder = int(angle_shoulder + 90)
-        servo_elbow = int(angle_elbow) 
-        servo_base = int(angle_base)
+        ideal_base = angle_base
+        ideal_shoulder = angle_shoulder + 90
+        ideal_elbow = angle_elbow
         
-        # Safe Output
-        return [90, 90, 90, 90, servo_elbow, servo_shoulder, servo_base] 
+        # Return IDEAL angles. conversion to RAW happens in Control Loop.
+        out = [90]*7
+        out[6] = int(ideal_base)
+        out[5] = int(ideal_shoulder)
+        out[4] = int(ideal_elbow)
+        
+        return out
 
 # -------------------- 3D Viz (Numpy) --------------------
 class Viz3D(FigureCanvasQTAgg):
@@ -343,12 +352,14 @@ class Viz3D(FigureCanvasQTAgg):
         super(Viz3D, self).__init__(self.fig)
         self.setParent(parent)
 
-    def update_plot(self, angles: List[float], kin: Kinematics):
+    def update_plot(self, ideal_angles: List[float], kin: Kinematics):
         self.ax.clear()
         self.ax.set_xlim(-300, 300)
         self.ax.set_ylim(-300, 300)
         self.ax.set_zlim(0, 500)
         self.ax.set_xlabel('X'); self.ax.set_ylabel('Y'); self.ax.set_zlabel('Z')
+        
+        # UI/Logic is now Ideal-based. No conversion needed here.
         
         # Helper: Rotation Matrices
         def rot_z(deg):
@@ -374,16 +385,16 @@ class Viz3D(FigureCanvasQTAgg):
         points = [T[:3, 3]]
         
         # 1. Base (Servo 7 - Pan)
-        # Rotates around Z. 90 -> 0 deg.
+        # Rotates around Z. 90 -> 90 deg (Y axis).
         # Height: L_BASE
-        pan_angle = angles[6] - 90
+        pan_angle = ideal_angles[6]
         T = T @ rot_z(pan_angle) @ trans(0, 0, kin.L_BASE)
         points.append(T[:3, 3])
         
         # 2. Shoulder (Servo 6 - Pitch)
         # Rotates around Y (local). 90 -> Up.
         # Length: L_HUMERUS
-        shoulder_angle = angles[5] - 90
+        shoulder_angle = ideal_angles[5] - 90
         # Check direction: usually positive pitch leans forward or back?
         # Let's assume + is "Back" (standard).
         T = T @ rot_y(shoulder_angle) @ trans(0, 0, kin.L_HUMERUS)
@@ -392,7 +403,7 @@ class Viz3D(FigureCanvasQTAgg):
         # 3. Elbow (Servo 5 - Pitch)
         # Rotates around Y. 90 -> Straight.
         # Length: L_FOREARM
-        elbow_angle = angles[4] - 90
+        elbow_angle = ideal_angles[4] - 90
         T = T @ rot_y(elbow_angle) @ trans(0, 0, kin.L_FOREARM)
         points.append(T[:3, 3]) # This is location of Servo 4
         
@@ -405,20 +416,21 @@ class Viz3D(FigureCanvasQTAgg):
         # Based on image, it looks like a hinge rotating perpendicular to arm axis?
         # Actually, if the previous joint was Y-pitch, "Side-Side" is typically X-Rotation (Roll) relative to world, but local Z relative to link?
         # Let's assume standard Wrist Twist or Pan.
-        yaw_angle = angles[3] - 90
+        yaw_angle = ideal_angles[3] - 90
         # If it's "Side by Side", and arm is horizontal (X), side-side is Y motion -> Rot around Z.
         T = T @ rot_z(yaw_angle) @ trans(0, 0, kin.L_WRIST/2) # Half wrist length?
         points.append(T[:3, 3])
         
         # 5. Wrist Pitch (Servo 3 - Up/Down)
         # "Head movement up and down"
-        pitch_angle = angles[2] - 90
+        pitch_angle = ideal_angles[2] - 90
         T = T @ rot_y(pitch_angle) @ trans(0, 0, kin.L_WRIST/2)
         points.append(T[:3, 3])
         
         # 6. Wrist Roll (Servo 2)
         # "Rotational for gripper" -> Roll around Axis (Z local)
-        roll_angle = angles[1] - 90
+        roll_angle = ideal_angles[1] - 90
+        T = T @ rot_z(roll_angle) @ trans(0, 0, 50) # Gripper length (approx 50mm)
         T = T @ rot_z(roll_angle) @ trans(0, 0, 50) # Gripper length (approx 50mm)
         points.append(T[:3, 3])
 
@@ -428,6 +440,9 @@ class Viz3D(FigureCanvasQTAgg):
         
         # Draw Base Ref
         self.ax.plot([0,0],[0,0],[0,0], 'k^') 
+        # Draw Axes
+        self.ax.plot([0,100],[0,0],[0,0], 'r-', label='X')
+        self.ax.plot([0,0],[0,100],[0,0], 'g-', label='Y')
         self.draw()
 
 
@@ -493,7 +508,8 @@ class MainWindow(QtWidgets.QMainWindow):
         return {
             "arduino_path": r"D:\programs\arduino\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe", 
             "board": "arduino:avr:uno",
-            "link_base": 100, "link_humerus": 140, "link_forearm": 140, "link_wrist": 60
+            "link_base": 100, "link_humerus": 140, "link_forearm": 140, "link_wrist": 60,
+            "calib": [90, 130, 110, 100, 95, 95, 90]
         }
 
     def save_config(self):
@@ -593,14 +609,28 @@ class MainWindow(QtWidgets.QMainWindow):
         form.addRow("Base Height (L1)", self.stBase)
         form.addRow("Humerus (L2)", self.stHum)
         form.addRow("Forearm (L3)", self.stFore)
+
+        g2 = self._card("Calibration (Val at 90°)")
+        form2 = QtWidgets.QFormLayout()
+        self.calibEdits = []
+        current_calib = self.config.get("calib", [90, 130, 110, 100, 95, 95, 90])
+        
+        # CHANGED: Order 1 to 7 (ascending) as per user request
+        for i in range(7):
+            idx = i # 0..6 (Servo 1..7)
+            le = QtWidgets.QLineEdit(str(current_calib[idx]))
+            form2.addRow(f"Servo {idx+1}", le)
+            self.calibEdits.append(le)
         
         btn_save = QtWidgets.QPushButton("Save Settings")
         btn_save.clicked.connect(self._save_settings)
         
         g.layout().addLayout(form)
-        g.layout().addWidget(btn_save)
+        g2.layout().addLayout(form2)
         
         L.addWidget(g)
+        L.addWidget(g2)
+        L.addWidget(btn_save)
         L.addStretch(1)
         return page
 
@@ -610,10 +640,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.config["link_base"] = float(self.stBase.text())
             self.config["link_humerus"] = float(self.stHum.text())
             self.config["link_forearm"] = float(self.stFore.text())
+            
+            # Save Calib
+            # calibEdits: [S1, S2, S3, S4, S5, S6, S7] (Now ascending)
+            new_calib = [90]*7
+            for i, le in enumerate(self.calibEdits):
+                new_calib[i] = int(float(le.text()))
+            
+            self.config["calib"] = new_calib
+            
             self.save_config()
             self._set_status("Settings Saved", OK_GREEN)
         except ValueError:
-            QtWidgets.QMessageBox.warning(self, "Invalid", "Lengths must be numbers")
+            QtWidgets.QMessageBox.warning(self, "Invalid", "Values must be numbers")
 
     def _solve_ik(self):
         try:
@@ -1185,23 +1224,32 @@ class MainWindow(QtWidgets.QMainWindow):
         # This prevents flooding the serial line with "90, 90, 90..." 50 times a second.
         
         if updated_phys:
+             # Convert IDEAL (rounded_pos) to RAW/PHYSICAL
+             if hasattr(self, 'kin'):
+                 raw_pos = [self.kin.get_raw(p, i) for i, p in enumerate(rounded_pos)]
+                 raw_pos = [int(max(0, min(180, x))) for x in raw_pos] # Clamp Check
+             else:
+                 raw_pos = rounded_pos
+
              # Check distinct
-             if rounded_pos != self.link.last_sent:
-                 self.link.send_all(rounded_pos)
+             if raw_pos != self.link.last_sent:
+                 self.link.send_all(raw_pos)
              
              # Updates XYZ in IK tab (Forward Kinematics)
              # We rely on the stored config/kinematics
              if hasattr(self, 'kin'):
-                 cur_xyz = self.kin.forward_kinematics(self.current_servo_pos)
-                 # Update texts if not currently focused (to avoid overwriting user typing? - actually user requested "supposed to change")
-                 # We'll just update them. 
-                 self.ikX.setText(f"{cur_xyz[0]:.1f}")
-                 self.ikY.setText(f"{cur_xyz[1]:.1f}")
-                 self.ikZ.setText(f"{cur_xyz[2]:.1f}")
+                 # kin.forward_kinematics now expects IDEAL angles (rounded_pos)
+                 cur_xyz = self.kin.forward_kinematics(rounded_pos)
+                 
+                 # Only update if user is NOT typing
+                 if not self.ikX.hasFocus(): self.ikX.setText(f"{cur_xyz[0]:.1f}")
+                 if not self.ikY.hasFocus(): self.ikY.setText(f"{cur_xyz[1]:.1f}")
+                 if not self.ikZ.hasFocus(): self.ikZ.setText(f"{cur_xyz[2]:.1f}")
 
-        # Update 3D Viz with the INTERPOLATED (Physical) position
+        # Update 3D Viz with the INTERPOLATED (Physical/Ideal) position
+        # Viz expects Ideal now.
         if self.viz:
-             self.viz.update_plot(self.current_servo_pos, self.kin)
+             self.viz.update_plot(rounded_pos, self.kin) # rounded_pos is Ideal
 
     # ---------- firmware upload ----------
     def upload_firmware(self):
