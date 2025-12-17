@@ -43,9 +43,14 @@ const int MAX_DELAY = 50;
 const float THRESHOLD = 0.5;
 
 int angleToPulse(float angle) {
-  // Mapping stays 0-180 to keep calibration correct
-  int pulse = map(round(angle), 0, 180, SERVO_MIN_PULSE, SERVO_MAX_PULSE);
-  return map(pulse, 0, 20000, 0, 4096);
+  // 1. Calculate pulse duration in microseconds (us) using float math
+  float pulse_us = SERVO_MIN_PULSE + ((angle / 180.0) * (SERVO_MAX_PULSE - SERVO_MIN_PULSE));
+  
+  // 2. Convert microseconds to PWM ticks (0-4096)
+  // Period of 50Hz is 20,000 microseconds
+  float pulses = (pulse_us / 20000.0) * 4096.0;
+  
+  return (int)pulses; 
 }
 
 float getSmoothFactor() {
