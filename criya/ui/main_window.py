@@ -182,6 +182,49 @@ class MainWindow(QtWidgets.QMainWindow):
         
         box.setLayout(form)
         layout.addWidget(box)
+
+        # Equations Area (Plain Display)
+        info = QtWidgets.QTextBrowser()
+        info.setOpenExternalLinks(True)
+        info.setReadOnly(True)
+        info.setFrameShape(QtWidgets.QFrame.Shape.NoFrame) # Remove border
+        info.setMinimumHeight(300) 
+        
+        # Transparent background, dark text
+        info.setStyleSheet("border: none; background-color: transparent; color: #1F2937; font-size: 13px;")
+        
+        info.setHtml("""
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: 'Segoe UI', sans-serif; color: #333;">
+            <p style="margin-top:0; font-size:14px; color:#0066CC;"><b>Geometric Inverse Kinematics</b></p>
+            <p>The robot position (X, Y, Z) is solved using a breakdown of the 5-DOF chain into a Planar 2-Link mechanism plus Base rotation.</p>
+            
+            <p><b>1. Base Rotation (θ<sub>1</sub>)</b><br>
+            θ<sub>1</sub> = atan2(y, x)<br>
+            <i>Radial Distance:</i> r<sub>total</sub> = √(x² + y²)</p>
+
+            <p><b>2. Planar Projection (R, Z)</b><br>
+            r<sub>wrist</sub> = r<sub>total</sub> - L<sub>Tool</sub><br>
+            z<sub>local</sub> = z - L<sub>Base</sub><br>
+            <i>Hypotenuse:</i> h = √(r<sub>wrist</sub>² + z<sub>local</sub>²)</p>
+
+            <p><b>3. Law of Cosines</b><br>
+            cos(γ) = (L₁² + L₂² - h²) / (2 · L₁ · L₂)<br>
+            cos(α) = (L₁² + h² - L₂²) / (2 · L₁ · h)<br>
+            β = atan2(z<sub>local</sub>, r<sub>wrist</sub>)</p>
+            
+            <p><b>4. Servo Angles</b><br>
+            Shoulder (S6) = β + α<br>
+            Elbow (S5) = 180° - γ</p>
+        </body>
+        </html>
+        """)
+        
+        layout.addWidget(info)
+        layout.addStretch(1) # Keep stretch at bottom to push content up
+        return page
+
         layout.addStretch(1)
         return page
 
