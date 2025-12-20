@@ -8287,3 +8287,109 @@
 2025-12-18 16:22:52,902 [WARNING] Servo 2 Clamped: 217 -> 180
 2025-12-18 16:22:52,965 [WARNING] Servo 2 Clamped: 220 -> 180
 2025-12-19 12:29:55,950 [INFO] === Application Started (Refactored) ===
+2025-12-19 12:43:58,665 [INFO] === Application Started (Refactored) ===
+2025-12-19 12:44:12,545 [INFO] IK Request: X=120.0, Y=2.1, Z=470.0 (Flags: True,True,True)
+2025-12-19 12:44:12,545 [WARNING] IK Failed: Unreachable (120.0, 2.1, 470.0)
+2025-12-19 12:44:16,270 [INFO] IK Request: X=120.0, Y=2.1, Z=470.0 (Flags: True,True,True)
+2025-12-19 12:44:16,271 [WARNING] IK Failed: Unreachable (120.0, 2.1, 470.0)
+2025-12-19 12:44:42,113 [INFO] IK Request: X=130.0, Y=0.0, Z=470.0 (Flags: True,False,False)
+2025-12-19 12:44:42,113 [WARNING] IK Failed: Unreachable (130.0, 0.0, 470.0)
+2025-12-19 12:44:47,747 [INFO] IK Request: X=130.0, Y=0.0, Z=470.0 (Flags: True,False,False)
+2025-12-19 12:44:47,747 [WARNING] IK Failed: Unreachable (130.0, 0.0, 470.0)
+2025-12-19 12:44:55,583 [INFO] IK Request: X=120.0, Y=0.0, Z=470.0 (Flags: False,False,False)
+2025-12-19 12:44:55,583 [INFO] IK Success: [90, 90, 90, 90, 0, 90, 90]
+2025-12-19 12:45:22,791 [INFO] IK Request: X=230.0, Y=0.0, Z=400.0 (Flags: False,False,True)
+2025-12-19 12:45:22,791 [INFO] IK Success: [90, 90, 90, 90, 65, 67, 90]
+2025-12-19 12:50:39,707 [INFO] === Application Started (Refactored) ===
+2025-12-19 12:50:59,457 [INFO] IK Request: X=120.0, Y=0.0, Z=400.0 (Flags: False,False,True)
+2025-12-19 12:50:59,458 [INFO] IK Success: [90, 90, 90, 90, 121, 11, 90]
+2025-12-19 12:53:42,404 [INFO] === Application Started (Refactored) ===
+2025-12-19 12:53:56,595 [INFO] IK Request: X=0.0, Y=0.0, Z=400.0 (Flags: True,True,True)
+2025-12-19 12:53:56,595 [WARNING] IK Failed: Unreachable (0.0, 0.0, 400.0)
+2025-12-19 12:54:02,415 [INFO] IK Request: X=120.0, Y=0.0, Z=400.0 (Flags: False,False,True)
+2025-12-19 12:54:02,415 [WARNING] IK Failed: Unreachable (120.0, 0.0, 400.0)
+2025-12-19 12:54:16,500 [INFO] IK Request: X=120.0, Y=0.0, Z=400.0 (Flags: False,False,True)
+2025-12-19 12:54:16,500 [WARNING] IK Failed: Unreachable (120.0, 0.0, 400.0)
+2025-12-19 13:02:51,203 [INFO] === Application Started (Refactored) ===
+2025-12-19 13:03:04,724 [INFO] IK Request: X=120.0, Y=0.0, Z=400.0 (Flags: True,True,True)
+2025-12-19 13:03:04,724 [INFO] IK Success: [90, 90, 90, 90, 0, 168, 90]
+2025-12-19 13:04:54,669 [INFO] IK Request: X=120.0, Y=0.0, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:04:54,670 [INFO] IK Success: [90, 90, 90, 90, 0, 168, 90]
+2025-12-19 13:07:05,097 [INFO] === Application Started (Refactored) ===
+2025-12-19 13:08:15,456 [INFO] IK Request: X=120.0, Y=0.0, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:08:15,456 [INFO] IK Success: [90, 90, 24, 90, 11, 143, 90]
+2025-12-19 13:10:28,496 [INFO] === Application Started (Refactored) ===
+2025-12-19 13:10:46,169 [INFO] IK Request: X=120.0, Y=0.0, Z=400.0 (Flags: True,True,True)
+2025-12-19 13:10:46,170 [INFO] IK Success: [90, 90, 155, 90, 11, 143, 90]
+2025-12-19 13:12:54,409 [INFO] IK Request: X=168.2, Y=0.0, Z=400.0 (Flags: True,True,True)
+2025-12-19 13:12:54,409 [INFO] IK Success: [90, 90, 146, 90, 14, 131, 90]
+2025-12-19 13:13:01,411 [INFO] IK Request: X=95.3, Y=0.0, Z=450.6 (Flags: True,True,True)
+2025-12-19 13:13:01,411 [INFO] IK Success: [90, 90, 170, 90, 50, 120, 90]
+2025-12-19 13:13:03,527 [WARNING] Servo 3 Clamped: 182 -> 180
+2025-12-19 13:13:03,608 [WARNING] Servo 3 Clamped: 183 -> 180
+2025-12-19 13:13:03,770 [WARNING] Servo 3 Clamped: 184 -> 180
+2025-12-19 13:13:03,849 [WARNING] Servo 3 Clamped: 185 -> 180
+2025-12-19 13:13:04,009 [WARNING] Servo 3 Clamped: 186 -> 180
+2025-12-19 13:13:04,158 [WARNING] Servo 3 Clamped: 186 -> 180
+2025-12-19 13:13:04,239 [WARNING] Servo 3 Clamped: 187 -> 180
+2025-12-19 13:13:04,317 [WARNING] Servo 3 Clamped: 188 -> 180
+2025-12-19 13:13:04,394 [WARNING] Servo 3 Clamped: 188 -> 180
+2025-12-19 13:13:04,469 [WARNING] Servo 3 Clamped: 189 -> 180
+2025-12-19 13:13:04,551 [WARNING] Servo 3 Clamped: 189 -> 180
+2025-12-19 13:13:04,715 [WARNING] Servo 3 Clamped: 190 -> 180
+2025-12-19 13:13:04,803 [WARNING] Servo 3 Clamped: 190 -> 180
+2025-12-19 13:13:24,058 [WARNING] Servo 3 Clamped: 189 -> 180
+2025-12-19 13:13:24,210 [WARNING] Servo 3 Clamped: 187 -> 180
+2025-12-19 13:13:24,280 [WARNING] Servo 3 Clamped: 185 -> 180
+2025-12-19 13:13:24,353 [WARNING] Servo 3 Clamped: 184 -> 180
+2025-12-19 13:13:24,428 [WARNING] Servo 3 Clamped: 183 -> 180
+2025-12-19 13:13:24,512 [WARNING] Servo 3 Clamped: 182 -> 180
+2025-12-19 13:14:24,070 [INFO] === Application Started (Refactored) ===
+2025-12-19 13:14:46,859 [INFO] IK Request: X=120.0, Y=0.0, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:14:46,860 [INFO] IK Success: [90, 90, 114, 90, 11, 143, 90]
+2025-12-19 13:15:13,545 [INFO] IK Request: X=120.0, Y=0.0, Z=402.3 (Flags: True,False,True)
+2025-12-19 13:15:13,546 [INFO] IK Success: [90, 90, 114, 90, 12, 142, 90]
+2025-12-19 13:15:21,149 [INFO] IK Request: X=120.0, Y=0.0, Z=404.0 (Flags: True,False,True)
+2025-12-19 13:15:21,149 [INFO] IK Success: [90, 90, 114, 90, 14, 141, 90]
+2025-12-19 13:15:27,763 [INFO] IK Request: X=150.0, Y=0.0, Z=408.9 (Flags: True,False,True)
+2025-12-19 13:15:27,764 [INFO] IK Success: [90, 90, 119, 90, 18, 132, 90]
+2025-12-19 13:15:57,495 [INFO] IK Request: X=118.5, Y=0.0, Z=400.0 (Flags: True,False,True)
+2025-12-19 13:15:57,495 [INFO] IK Success: [90, 90, 114, 90, 11, 143, 90]
+2025-12-19 13:16:11,419 [INFO] IK Request: X=200.0, Y=0.0, Z=402.3 (Flags: True,False,True)
+2025-12-19 13:16:11,419 [INFO] IK Success: [90, 90, 128, 90, 19, 121, 90]
+2025-12-19 13:19:44,836 [INFO] === Application Started (Refactored) ===
+2025-12-19 13:20:08,711 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:20:08,711 [WARNING] IK Failed: Unreachable (119.98172341876695, 2.0942887724740213, 400.0)
+2025-12-19 13:20:14,774 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:20:14,775 [WARNING] IK Failed: Unreachable (119.98172341876695, 2.0942887724740213, 400.0)
+2025-12-19 13:20:43,158 [INFO] IK Request: X=150.0, Y=2.0942887724740213, Z=400.0 (Flags: True,False,True)
+2025-12-19 13:20:43,158 [WARNING] IK Failed: Unreachable (150.0, 2.0942887724740213, 400.0)
+2025-12-19 13:20:47,989 [INFO] IK Request: X=150.0, Y=2.0942887724740213, Z=470.0 (Flags: True,False,False)
+2025-12-19 13:20:47,990 [INFO] IK Success: [90, 90, 90, 90, 5, 132, 90]
+2025-12-19 13:20:48,804 [INFO] IK Request: X=121.9, Y=2.1274743160997933, Z=467.8524045322629 (Flags: True,False,False)
+2025-12-19 13:20:48,804 [INFO] IK Success: [90, 90, 90, 90, 0, 142, 90]
+2025-12-19 13:21:03,832 [INFO] IK Request: X=200.0, Y=0.0, Z=301.24247332954604 (Flags: True,False,False)
+2025-12-19 13:21:03,832 [WARNING] IK Failed: Unreachable (200.0, 0.0, 301.24247332954604)
+2025-12-19 13:21:08,830 [INFO] IK Request: X=300.0, Y=0.0, Z=301.24247332954604 (Flags: True,False,False)
+2025-12-19 13:21:08,830 [INFO] IK Success: [90, 90, 154, 90, 8, 106, 90]
+2025-12-19 13:22:05,499 [INFO] === Application Started (Refactored) ===
+2025-12-19 13:22:24,587 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:22:24,588 [WARNING] IK Failed: Unreachable (119.98172341876695, 2.0942887724740213, 400.0)
+2025-12-19 13:22:36,485 [INFO] IK Request: X=200.0, Y=2.0942887724740213, Z=470.0 (Flags: True,False,False)
+2025-12-19 13:22:36,485 [INFO] IK Success: [90, 90, 90, 90, 17, 116, 90]
+2025-12-19 13:22:52,504 [INFO] IK Request: X=197.44661696521973, Y=0.0, Z=296.9524641759742 (Flags: False,False,False)
+2025-12-19 13:22:52,504 [WARNING] IK Failed: Unreachable (197.44661696521973, 0.0, 296.9524641759742)
+2025-12-19 13:24:17,365 [INFO] === Application Started (Refactored) ===
+2025-12-19 13:24:34,946 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:24:37,679 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:24:40,119 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:24:40,605 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:24:40,905 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:24:41,048 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:24:41,256 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:25:51,102 [INFO] === Application Started (Refactored) ===
+2025-12-19 13:26:06,959 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:26:06,959 [INFO] IK Success: [90, 90, 84, 90, 0, 159, 91]
+2025-12-19 13:30:03,187 [INFO] === Application Started (Refactored) ===
+2025-12-19 13:30:23,861 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-19 13:30:23,861 [INFO] IK Success: [90, 90, 54, 90, 0, 159, 91]

@@ -305,6 +305,11 @@ class MainWindow(QtWidgets.QMainWindow):
             if hasattr(self, 'kin') and hasattr(self, 'current_servo_pos'):
                  # Use slider angles (Ideal) for FK
                  cur_pos = self.kin.forward_kinematics(self.angles)
+                 
+                 # FEATURE: Auto-populate text fields if they are 0.0 to prevent accidents
+                 if float(self.ikX.text() or 0) == 0: self.ikX.setText(f"{cur_pos[0]:.1f}")
+                 if float(self.ikY.text() or 0) == 0: self.ikY.setText(f"{cur_pos[1]:.1f}")
+                 if float(self.ikZ.text() or 0) == 0: self.ikZ.setText(f"{cur_pos[2]:.1f}")
 
             x = float(self.ikX.text()) if self.chkX.isChecked() else cur_pos[0]
             y = float(self.ikY.text()) if self.chkY.isChecked() else cur_pos[1]
@@ -312,14 +317,15 @@ class MainWindow(QtWidgets.QMainWindow):
             
             logging.info(f"IK Request: X={x}, Y={y}, Z={z} (Flags: {self.chkX.isChecked()},{self.chkY.isChecked()},{self.chkZ.isChecked()})")
             
-            sol = self.kin.inverse_kinematics(x, y, z)
+            # Pass current_angles for continuity optimization
+            sol = self.kin.inverse_kinematics(x, y, z, current_angles=self.angles)
             if sol:
                 logging.info(f"IK Success: {sol}")
                 self.smooth_move(sol) # Use smooth move to target
                 self._set_status(f"Moved to ({x},{y},{z})", OK_GREEN)
             else:
                 logging.warning(f"IK Failed: Unreachable ({x}, {y}, {z})")
-                QtWidgets.QMessageBox.warning(self, "Unreachable", "Target out of reach")
+                QtWidgets.QMessageBox.warning(self, "Move Failed", "Target Unreachable.\nThe point is outside the robot's workspace.")
         except ValueError:
              QtWidgets.QMessageBox.warning(self, "Error", "Invalid coordinates")
 
