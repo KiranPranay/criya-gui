@@ -23,32 +23,41 @@ class SerialLink(QtCore.QObject):
         self.port_name = ""
         self.baud = 9600
         self.connected = False
-        
-        # We can implement auto-refresh or threading here if desired
-        # For now keeping logic from main.py
+        self.dummy_mode = False # Logic Flag
 
     def available_ports(self):
-        if not HAVE_SERIAL:
-            return []
-        try:
-            pts = serial.tools.list_ports.comports()
-            return [p.device for p in pts]
-        except Exception as e:
-            logging.error(f"Serial scan error: {e}")
-            return []
+        ports = []
+        if HAVE_SERIAL:
+            try:
+                pts = serial.tools.list_ports.comports()
+                ports = [p.device for p in pts]
+            except Exception as e:
+                logging.error(f"Serial scan error: {e}")
+        
+        # Always allow Dummy if enabled or strictly requested
+        if self.dummy_mode:
+            ports.append("Simulated Arm")
+        return ports
 
     def refresh_ports(self):
         pts = self.available_ports()
         self.portsChanged.emit(pts)
 
     def connect(self, port: str, baud: int):
+        self.port_name = port
+        self.baud = baud
+        
+        # Handle Dummy Connection
+        if port == "Simulated Arm":
+            self.connected = True
+            self.dummy_mode = True # Ensure flag is set
+            self.statusChanged.emit(f"Simulated: vRobot @ {baud}", "blue")
+            return
+
         if not HAVE_SERIAL:
             self.statusChanged.emit("PySerial not installed", "red")
             return
             
-        self.port_name = port
-        self.baud = baud
-        
         try:
             if self.ser and self.ser.is_open:
                 self.ser.close()
@@ -78,14 +87,19 @@ class SerialLink(QtCore.QObject):
             self.connect(self.port_name, self.baud)
 
     def _write_raw(self, b: bytes):
-        if self.connected and self.ser:
-            try:
-                self.ser.write(b)
-                # logging.debug(f"TX: {b}")
-            except Exception as e:
-                logging.error(f"Write error: {e}")
-                self.statusChanged.emit("Write Error", "red")
-                self.disconnect()
+        if self.connected:
+            # If Dummy, just pretend we sent it
+            if self.port_name == "Simulated Arm":
+                # logging.info(f"SIM TX: {b}")
+                return
+
+            if self.ser:
+                try:
+                    self.ser.write(b)
+                except Exception as e:
+                    logging.error(f"Write error: {e}")
+                    self.statusChanged.emit("Write Error", "red")
+                    self.disconnect()
 
     def send_angle(self, idx: int, angle: int):
         # Firmware expects: "ID ANGLE" (e.g. "1 90")

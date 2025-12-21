@@ -270,14 +270,38 @@ class MainWindow(QtWidgets.QMainWindow):
         btn_save = QtWidgets.QPushButton("Save Settings")
         btn_save.clicked.connect(self._save_settings)
         
+        
+        # New: App Settings (Demo Mode)
+        g_app = self._card("Application Settings")
+        # g_app already has a layout from _card()
+        app_layout = g_app.layout() 
+        
+        self.chkDemo = QtWidgets.QCheckBox("Enable Demo / Simulation Mode")
+        self.chkDemo.setToolTip("Allows connecting to a 'Simulated Arm' without physical hardware.")
+        
+        # Connect logic
+        self.chkDemo.toggled.connect(self._toggle_demo_mode)
+        
+        app_layout.addWidget(self.chkDemo)
+
         g.layout().addLayout(form)
         g2.layout().addLayout(form2)
         
         L.addWidget(g)
         L.addWidget(g2)
+        L.addWidget(g_app)
         L.addWidget(btn_save)
         L.addStretch(1)
         return page
+
+    def _toggle_demo_mode(self, checked: bool):
+        self.link.dummy_mode = checked
+        self.link.refresh_ports()
+        if checked:
+            QtWidgets.QMessageBox.information(self, "Demo Mode", "Demo Mode Enabled.\nGo to 'Controls' -> 'Connection' and select 'Simulated Arm'.")
+        else:
+             if self.link.port_name == "Simulated Arm" and self.link.connected:
+                 self.link.disconnect()
 
     # --- Actions ---
     def _save_settings(self):
@@ -436,11 +460,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # Buttons Grid (2 rows)
         grid = QtWidgets.QGridLayout()
         btn_refresh = QtWidgets.QPushButton("Refresh"); btn_refresh.setProperty("flat", True)
-        btn_connect = QtWidgets.QPushButton("Connect")
+        self.btnConnect = QtWidgets.QPushButton("Connect")
         btn_disconnect = QtWidgets.QPushButton("Disconnect"); btn_disconnect.setProperty("danger", True)
         btn_reconnect  = QtWidgets.QPushButton("Reconnect"); btn_reconnect.setProperty("warn", True)
         
-        grid.addWidget(btn_connect, 0, 0)
+        grid.addWidget(self.btnConnect, 0, 0)
         grid.addWidget(btn_disconnect, 0, 1)
         grid.addWidget(btn_refresh, 1, 0)
         grid.addWidget(btn_reconnect, 1, 1)
@@ -448,7 +472,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addLayout(grid)
 
         btn_refresh.clicked.connect(self.link.refresh_ports)
-        btn_connect.clicked.connect(self._do_connect)
+        self.btnConnect.clicked.connect(self._do_connect)
         btn_disconnect.clicked.connect(self.link.disconnect)
         btn_reconnect.clicked.connect(self.link.force_reconnect)
         return g
@@ -660,7 +684,23 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _set_status(self, text: str, color: str):
         self.status_label.setText(text)
-        self.status_label.setStyleSheet(f"color:{color};")
+        self.status_label.setStyleSheet(f"color: {color}; font-weight: bold;")
+        
+        if self.link.connected:
+             self.btnConnect.setText("Disconnect")
+             self.btnConnect.setStyleSheet(f"background-color: #FEF2F2; color: #DC2626; border-color: #FECACA;")
+             # Force initial visualization update so the arm appears immediately
+             self._update_viz_from_sliders()
+        else:
+             self.btnConnect.setText("Connect")
+             self.btnConnect.setStyleSheet("") # Revert to default primary
+
+    def _update_viz_from_sliders(self):
+        # Force redraw using current stored angles
+        if self.viz and hasattr(self, 'kin'):
+            # Use current angles (self.angles is source of truth)
+            # Or should we grab from sliders? self.angles is synced.
+            self.viz.update_plot(self.angles, self.kin)
 
     def _check_connection(self):
         if self.link.ser and not self.link.ser.is_open:
@@ -682,9 +722,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # ---------- servo events ----------
     def _on_slider(self, idx: int, val: int):
-        # Only update target. Control loop handles the move.
         self.angles[idx] = val
         self.edits[idx].setText(str(val))
+        
+        # Live Update
+        self._update_viz_from_sliders()
+        
+        # Send to Robot (Simulated or Real)
+        # Use current positions for others
+        self.link.send_angle(idx, val)
+        
+        # Keep current_servo_pos synced to avoid jumps if control loop runs
+        if idx < len(self.current_servo_pos):
+            self.current_servo_pos[idx] = float(val)
 
     # ---------- smooth move (Sequence/UI Animation) ----------
     def smooth_move(self, target: List[int], speed_override: Optional[int] = None, on_done: Optional[callable] = None):

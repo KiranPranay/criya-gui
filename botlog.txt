@@ -8615,3 +8615,79 @@
 2025-12-20 14:57:28,719 [INFO] IK Found Solution at Pitch -20: S6=106.0, S5=9.6, S3=44.5
 2025-12-20 14:57:28,719 [INFO] IK Success: [90, 130, 64, 100, 14, 110, 148]
 2025-12-20 17:20:36,231 [ERROR] Write error: WriteFile failed (PermissionError(13, 'The device does not recognize the command.', None, 22))
+2025-12-21 14:35:38,564 [INFO] === Application Started (Refactored) ===
+2025-12-21 14:42:00,755 [INFO] === Application Started (Refactored) ===
+2025-12-21 14:43:58,984 [INFO] === Application Started (Refactored) ===
+2025-12-21 14:45:41,216 [INFO] === Application Started (Refactored) ===
+2025-12-21 14:46:43,078 [ERROR] Connect error: could not open port 'COM10': OSError(22, 'The semaphore timeout period has expired.', None, 121)
+2025-12-21 14:46:48,222 [ERROR] Connect error: could not open port 'COM10': OSError(22, 'The semaphore timeout period has expired.', None, 121)
+2025-12-21 14:46:53,350 [ERROR] Connect error: could not open port 'COM10': OSError(22, 'The semaphore timeout period has expired.', None, 121)
+2025-12-21 14:46:58,476 [ERROR] Connect error: could not open port 'COM10': OSError(22, 'The semaphore timeout period has expired.', None, 121)
+2025-12-21 14:47:28,421 [INFO] === Application Started (Refactored) ===
+2025-12-21 14:50:25,857 [INFO] === Application Started (Refactored) ===
+2025-12-21 14:53:00,631 [INFO] === Application Started (Refactored) ===
+2025-12-21 14:57:13,732 [INFO] === Application Started (Refactored) ===
+2025-12-21 19:17:34,025 [INFO] === Application Started (Refactored) ===
+2025-12-21 19:20:40,116 [INFO] === Application Started (Refactored) ===
+2025-12-21 19:22:41,815 [INFO] === Application Started (Refactored) ===
+2025-12-21 19:23:57,136 [INFO] IK Request: X=0.0, Y=0.0, Z=470.0 (Flags: True,True,True)
+2025-12-21 19:23:57,137 [INFO] IK Found Solution at Pitch 40: S6=136.3, S5=67.5, S3=16.2
+2025-12-21 19:23:57,137 [INFO] IK Success: [90, 154, 26, 91, 78, 137, 138]
+2025-12-21 19:24:02,071 [INFO] IK Request: X=200.0, Y=0.0, Z=470.0 (Flags: True,True,True)
+2025-12-21 19:24:02,071 [INFO] IK Found Solution at Pitch 25: S6=99.1, S5=65.0, S3=40.8
+2025-12-21 19:24:02,071 [INFO] IK Success: [90, 154, 50, 91, 76, 100, 138]
+2025-12-21 19:24:06,975 [INFO] IK Request: X=200.0, Y=290.0, Z=470.0 (Flags: True,True,True)
+2025-12-21 19:24:06,975 [WARNING] IK Failed: Unreachable (200.0, 290.0, 470.0)
+2025-12-21 19:24:11,371 [INFO] IK Request: X=202.09301858711433, Y=290.0, Z=466.83180914163705 (Flags: False,True,False)
+2025-12-21 19:24:11,371 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,False)
+2025-12-21 19:24:11,371 [INFO] IK Found Solution at Pitch 0: S6=111.6, S5=4.6, S3=63.8
+2025-12-21 19:24:11,371 [INFO] Relaxation Success at (0, 290.0, 300)
+2025-12-21 19:24:11,372 [INFO] IK Success: [90, 154, 73, 91, 15, 112, 228]
+2025-12-21 19:24:16,127 [INFO] IK Request: X=217.26193030358877, Y=300.0, Z=290.7300798924849 (Flags: False,True,False)
+2025-12-21 19:24:16,127 [INFO] IK Found Solution at Pitch 0: S6=75.3, S5=35.3, S3=69.4
+2025-12-21 19:24:16,128 [INFO] IK Success: [90, 154, 79, 91, 46, 76, 192]
+2025-12-21 19:24:20,327 [INFO] IK Request: X=276.21276891677456, Y=600.0, Z=285.52100211489653 (Flags: False,True,False)
+2025-12-21 19:24:20,327 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,False)
+2025-12-21 19:24:20,327 [WARNING] IK Failed: Unreachable (276.21276891677456, 600.0, 285.52100211489653)
+2025-12-21 19:24:24,782 [INFO] IK Request: X=276.21276891677456, Y=400.0, Z=285.52100211489653 (Flags: False,True,False)
+2025-12-21 19:24:24,782 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,False)
+2025-12-21 19:24:24,783 [INFO] IK Found Solution at Pitch 0: S6=49.5, S5=75.4, S3=55.1
+2025-12-21 19:24:24,783 [INFO] Relaxation Success at (0, 400.0, 300)
+2025-12-21 19:24:24,783 [INFO] IK Success: [90, 154, 65, 91, 86, 50, 228]
+2025-12-21 19:24:31,720 [INFO] IK Request: X=298.89151692827767, Y=400.0, Z=200.0 (Flags: False,True,True)
+2025-12-21 19:24:31,720 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,True)
+2025-12-21 19:24:31,720 [INFO] IK Found Solution at Pitch 0: S6=64.0, S5=15.6, S3=100.4
+2025-12-21 19:24:31,720 [INFO] Relaxation Success at (0, 400.0, 200.0)
+2025-12-21 19:24:31,720 [INFO] IK Success: [90, 154, 110, 91, 26, 65, 228]
+2025-12-21 19:24:35,230 [INFO] IK Request: X=297.05509000327413, Y=400.0, Z=100.0 (Flags: False,True,True)
+2025-12-21 19:24:35,230 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,True)
+2025-12-21 19:24:35,230 [INFO] IK Found Solution at Pitch 0: S6=42.9, S5=6.2, S3=131.0
+2025-12-21 19:24:35,230 [INFO] Relaxation Success at (0, 400.0, 100.0)
+2025-12-21 19:24:35,231 [INFO] IK Success: [90, 154, 140, 91, 17, 43, 228]
+2025-12-21 19:24:38,514 [INFO] IK Request: X=296.6976274364212, Y=400.0, Z=89.8 (Flags: False,True,True)
+2025-12-21 19:24:38,514 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,True)
+2025-12-21 19:24:38,515 [INFO] IK Found Solution at Pitch 0: S6=39.6, S5=7.0, S3=133.5
+2025-12-21 19:24:38,515 [INFO] Relaxation Success at (0, 400.0, 89.8)
+2025-12-21 19:24:38,515 [INFO] IK Success: [90, 154, 143, 91, 17, 40, 228]
+2025-12-21 19:24:44,267 [INFO] IK Request: X=295.5786292771148, Y=400.0, Z=79.1 (Flags: False,True,True)
+2025-12-21 19:24:44,267 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,True)
+2025-12-21 19:24:44,268 [INFO] IK Found Solution at Pitch 0: S6=35.9, S5=8.1, S3=135.9
+2025-12-21 19:24:44,268 [INFO] Relaxation Success at (0, 400.0, 79.1)
+2025-12-21 19:24:44,268 [INFO] IK Success: [90, 154, 145, 91, 19, 36, 228]
+2025-12-21 19:24:48,165 [INFO] IK Request: X=296.4324466972298, Y=400.0, Z=500.0 (Flags: False,True,True)
+2025-12-21 19:24:48,166 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,True)
+2025-12-21 19:24:48,166 [WARNING] IK Failed: Unreachable (296.4324466972298, 400.0, 500.0)
+2025-12-21 19:24:52,268 [INFO] IK Request: X=296.4324466972298, Y=400.0, Z=400.0 (Flags: False,True,True)
+2025-12-21 19:24:52,268 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,True)
+2025-12-21 19:24:52,268 [WARNING] IK Failed: Unreachable (296.4324466972298, 400.0, 400.0)
+2025-12-21 19:24:56,319 [INFO] IK Request: X=296.4324466972298, Y=400.0, Z=350.0 (Flags: False,True,True)
+2025-12-21 19:24:56,319 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,True)
+2025-12-21 19:24:56,320 [INFO] IK Found Solution at Pitch 20: S6=47.6, S5=71.3, S3=81.2
+2025-12-21 19:24:56,320 [INFO] Relaxation Success at (0, 400.0, 350.0)
+2025-12-21 19:24:56,320 [INFO] IK Success: [90, 154, 91, 91, 82, 48, 228]
+2025-12-21 19:25:08,573 [INFO] IK Request: X=299.54146735150164, Y=200.0, Z=344.0163265452591 (Flags: False,True,False)
+2025-12-21 19:25:08,573 [INFO] IK Found Solution at Pitch 5: S6=68.7, S5=59.2, S3=57.1
+2025-12-21 19:25:08,574 [INFO] IK Success: [90, 154, 67, 91, 70, 69, 171]
+2025-12-21 19:25:13,771 [INFO] IK Request: X=304.66074161332466, Y=200.0, Z=338.1459035166865 (Flags: False,True,False)
+2025-12-21 19:25:13,772 [INFO] IK Found Solution at Pitch 5: S6=68.7, S5=56.4, S3=59.8
+2025-12-21 19:25:13,772 [INFO] IK Success: [90, 154, 69, 91, 67, 69, 171]
