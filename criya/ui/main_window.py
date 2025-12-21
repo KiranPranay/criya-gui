@@ -28,13 +28,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # state
         self.link = SerialLink(self)
-        self.angles = [90]*7
+        self.config = self.load_config() # Load config EARLY
+        # Initialize angles to Calibration Values (Geometric Home)
+        # This prevents the IK from seeing a "twisted" start state if calibration is large
+        self.angles = self.config.get("calibration", [90]*7)
         self.reset_defaults = [0,90,90,90,90,90,90]
         self.saved_positions: Dict[str, List[int]] = {}
         self.sequence: List[SeqStep] = []
         
-        # Config
-        self.config = self.load_config()
+        self.sequence: List[SeqStep] = []
+        
+        # Config (Already loaded above)
         self.kin = Kinematics(self.config)
         
         # Smooth Manual Control State
@@ -319,8 +323,86 @@ class MainWindow(QtWidgets.QMainWindow):
             
             # Pass current_angles for continuity optimization
             sol = self.kin.inverse_kinematics(x, y, z, current_angles=self.angles)
+            
+            # --- Fallback: Relaxation for Optional Axes ---
+            # If standard solve failed, AND we have unchecked (optional) axes, try to adjust them.
+            if not sol:
+                 use_x, use_y, use_z = self.chkX.isChecked(), self.chkY.isChecked(), self.chkZ.isChecked()
+                 # Only try if at least one axis is optional
+                 if not (use_x and use_y and use_z):
+                      logging.info(f"IK Strict Failed. Attempting relaxation (Flags: {use_x},{use_y},{use_z})")
+                      
+                      # Heuristic: Simple bounded search or projection
+                      # We want to find (x', y', z') closest to (x,y,z) that is reachable,
+                      # BUT we must perfectly respect the Checked axes.
+                      
+                      # 1. Check Reachability (Radius)
+                      # Max Reach approx sum of links (minus some buffer)
+                      # Base=120, Humerus=120, Seg1=75, Seg2=85, Seg3=75, Tool=120
+                      # Max Horizontal ~ 120+75+85+75+120 = 475mm (from Shoulder)
+                      # Max Vertical ~ Base + 475
+                      # This is complex to solve analytically general-case.
+                      # Let's try a Grid Search on the FREE axes?
+                      # Or just "Project to Hull".
+                      
+                      # Simpler: Iterative Approach.
+                      # If X is free, try X=0 (Closest to center usually helps Reach).
+                      # If Z is free, try Z=Base + Humerus (Mid-height).
+                      
+                      # Let's try 3 "smart" variations:
+                      # A. Relax Free Axes to 0 (for X/Y) or Mid-Height (for Z)
+                      candidates = []
+                      
+                      # Base guess: Keep checked, use current for others (already tried)
+                      
+                      # Guess 1: Zero out Free X/Y (Center is most reachable horizontally)
+                      g1_x = x if use_x else 0
+                      g1_y = y if use_y else 0
+                      g1_z = z if use_z else 300 # Mid-range Z
+                      candidates.append((g1_x, g1_y, g1_z))
+                      
+                      # Guess 2: If Free X/Y, try to maintain Radius but rotate? No, X/Y are Cartesian.
+                      # If X is free, but Y is forced 250...
+                      # Maybe Current X was 267 (Too far). X=0 is closest.
+                      # We tried X=0.
+                      
+                      # Guess 3: If Z is free, try varying Z
+                      if not use_z:
+                          candidates.append((x, y, 200)) # Lower
+                          candidates.append((x, y, 400)) # Higher
+                          
+                      for (cx, cy, cz) in candidates:
+                           tsol = self.kin.inverse_kinematics(cx, cy, cz, current_angles=self.angles)
+                           if tsol:
+                               logging.info(f"Relaxation Success at ({cx}, {cy}, {cz})")
+                               sol = tsol
+                               x, y, z = cx, cy, cz # Update target to what we found
+                               
+                               # Update UI to reflect the "Changed" value
+                               if not use_x: self.ikX.setText(f"{x:.1f}")
+                               if not use_y: self.ikY.setText(f"{y:.1f}")
+                               if not use_z: self.ikZ.setText(f"{z:.1f}")
+                               break
+
             if sol:
                 logging.info(f"IK Success: {sol}")
+                
+                # --- USER REQUESTED LOGGING ---
+                try:
+                    with open("resultlog.txt", "a") as f:
+                        f.write(f"existing cartician : ({cur_pos[0]:.2f}, {cur_pos[1]:.2f}, {cur_pos[2]:.2f})\n")
+                        f.write(f"Target cartician: ({x:.2f}, {y:.2f}, {z:.2f})\n")
+                        f.write(f"Computed calibrated angles: {tuple(sol)}\n")
+                        f.write("\nAfter applying angles,\n")
+                        f.write(f"The current angles : {tuple(sol)}\n")
+                        # Calculate resulting FK to confirm
+                        res_fk = self.kin.forward_kinematics(sol)
+                        f.write(f"The current cartician: ({res_fk[0]:.2f}, {res_fk[1]:.2f}, {res_fk[2]:.2f})\n")
+                        f.write("-" * 30 + "\n")
+                except Exception as e:
+                    logging.error(f"Failed to write to resultlog.txt: {e}")
+                # -----------------------------
+
                 self.smooth_move(sol) # Use smooth move to target
                 self._set_status(f"Moved to ({x},{y},{z})", OK_GREEN)
             else:

@@ -1,0 +1,157 @@
+Running Calibrated IK Simulation...
+
+Initial Position:
+Cartesian     : (178.50, 19.90, 485.00)
+Angles (Ideal): (90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0)
+Angles (Raw)  : (90.0, 130.0, 110.0, 100.0, 95.0, 95.0, 90.0)
+
+Target Position:
+Cartesian : (178.50, 19.90, 300.00)
+Computed angles (Ideal): (90.0, 130.0, 75.0, 90.0, 90.0, 66.0, 96.0)
+Computed angles (Raw)  : (90.0, 130.0, 95.0, 100.0, 95.0, 71.0, 96.0)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (178.50, 19.90, 300.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (178.50, 19.90, 300.00)
+Angles (Ideal): (90.0, 130.0, 75.0, 90.0, 90.0, 66.0, 96.0)
+Angles (Raw)  : (90.0, 130.0, 95.0, 100.0, 95.0, 71.0, 96.0)
+
+Target Position:
+Cartesian : (178.50, 19.90, 395.00)
+Computed angles (Ideal): (90.0, 130.0, 75.0, 90.0, 63.0, 47.0, 96.0)
+Computed angles (Raw)  : (90.0, 130.0, 95.0, 100.0, 68.0, 52.0, 96.0)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (178.50, 19.90, 395.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (178.50, 19.90, 395.00)
+Angles (Ideal): (90.0, 130.0, 75.0, 90.0, 63.0, 47.0, 96.0)
+Angles (Raw)  : (90.0, 130.0, 95.0, 100.0, 68.0, 52.0, 96.0)
+
+Target Position:
+Cartesian : (178.50, 19.90, 150.00)
+Computed angles (Ideal): (90.0, 130.0, 75.0, 90.0, 139.0, 84.0, 96.0)
+Computed angles (Raw)  : (90.0, 130.0, 95.0, 100.0, 144.0, 89.0, 96.0)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (178.50, 19.90, 150.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (178.50, 19.90, 150.00)
+Angles (Ideal): (90.0, 130.0, 75.0, 90.0, 139.0, 84.0, 96.0)
+Angles (Raw)  : (90.0, 130.0, 95.0, 100.0, 144.0, 89.0, 96.0)
+
+Target Position:
+Cartesian : (250.00, 0.00, 200.00)
+Computed angles (Ideal): (90.0, 130.0, 105.0, 90.0, 90.0, 25.0, 90.0)
+Computed angles (Raw)  : (90.0, 130.0, 125.0, 100.0, 95.0, 30.0, 90.0)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (250.00, 0.00, 200.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (250.00, 0.00, 200.00)
+Angles (Ideal): (90.0, 130.0, 105.0, 90.0, 90.0, 25.0, 90.0)
+Angles (Raw)  : (90.0, 130.0, 125.0, 100.0, 95.0, 30.0, 90.0)
+
+Target Position:
+Cartesian : (120.00, 0.00, 200.00)
+Computed angles (Ideal): (90.0, 130.0, -6.0, 90.0, 132.0, 153.0, 90.0)
+Computed angles (Raw)  : (90.0, 130.0, 14.0, 100.0, 137.0, 158.0, 90.0)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (120.00, 0.00, 200.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (120.00, 0.00, 200.00)
+Angles (Ideal): (90.0, 130.0, -6.0, 90.0, 132.0, 153.0, 90.0)
+Angles (Raw)  : (90.0, 130.0, 14.0, 100.0, 137.0, 158.0, 90.0)
+
+Target Position:
+Cartesian : (200.00, 50.00, 200.00)
+Computed angles (Ideal): (90.0, 130.0, 82.0, 90.0, 101.0, 43.0, 104.0)
+Computed angles (Raw)  : (90.0, 130.0, 102.0, 100.0, 106.0, 48.0, 104.0)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (200.00, 50.00, 200.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (200.00, 50.00, 200.00)
+Angles (Ideal): (90.0, 130.0, 82.0, 90.0, 101.0, 43.0, 104.0)
+Angles (Raw)  : (90.0, 130.0, 102.0, 100.0, 106.0, 48.0, 104.0)
+
+Target Position:
+Cartesian : (200.00, -50.00, 200.00)
+Computed angles (Ideal): (90.0, 130.0, 82.0, 90.0, 101.0, 43.0, 75.9)
+Computed angles (Raw)  : (90.0, 130.0, 102.0, 100.0, 106.0, 48.0, 75.9)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (200.00, -50.00, 200.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (200.00, -50.00, 200.00)
+Angles (Ideal): (90.0, 130.0, 82.0, 90.0, 101.0, 43.0, 75.9)
+Angles (Raw)  : (90.0, 130.0, 102.0, 100.0, 106.0, 48.0, 75.9)
+
+Target Position:
+Cartesian : (150.00, 100.00, 350.00)
+Computed angles (Ideal): (90.0, 130.0, 82.0, 90.0, 72.0, 61.0, 123.7)
+Computed angles (Raw)  : (90.0, 130.0, 102.0, 100.0, 77.0, 66.0, 123.7)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (150.00, 100.00, 350.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (150.00, 100.00, 350.00)
+Angles (Ideal): (90.0, 130.0, 82.0, 90.0, 72.0, 61.0, 123.7)
+Angles (Raw)  : (90.0, 130.0, 102.0, 100.0, 77.0, 66.0, 123.7)
+
+Target Position:
+Cartesian : (220.00, -80.00, 100.00)
+Computed angles (Ideal): (90.0, 130.0, 102.0, 90.0, 109.0, 34.0, 69.9)
+Computed angles (Raw)  : (90.0, 130.0, 122.0, 100.0, 114.0, 39.0, 69.9)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (220.00, -80.00, 100.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (220.00, -80.00, 100.00)
+Angles (Ideal): (90.0, 130.0, 102.0, 90.0, 109.0, 34.0, 69.9)
+Angles (Raw)  : (90.0, 130.0, 122.0, 100.0, 114.0, 39.0, 69.9)
+
+Target Position:
+Cartesian : (0.00, 200.00, 250.00)
+Computed angles (Ideal): (90.0, 130.0, 72.0, 90.0, 84.0, 84.0, 180.0)
+Computed angles (Raw)  : (90.0, 130.0, 92.0, 100.0, 89.0, 89.0, 180.0)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (0.00, 200.00, 250.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (0.00, 200.00, 250.00)
+Angles (Ideal): (90.0, 130.0, 72.0, 90.0, 84.0, 84.0, 180.0)
+Angles (Raw)  : (90.0, 130.0, 92.0, 100.0, 89.0, 89.0, 180.0)
+
+Target Position:
+Cartesian : (280.00, 0.00, 50.00)
+Computed angles (Ideal): (90.0, 130.0, 118.0, 90.0, 84.0, 3.0, 90.0)
+Computed angles (Raw)  : (90.0, 130.0, 138.0, 100.0, 89.0, 8.0, 90.0)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (280.00, 0.00, 50.00)
+--------------------------------------------------
+
+Initial Position:
+Cartesian     : (280.00, 0.00, 50.00)
+Angles (Ideal): (90.0, 130.0, 118.0, 90.0, 84.0, 3.0, 90.0)
+Angles (Raw)  : (90.0, 130.0, 138.0, 100.0, 89.0, 8.0, 90.0)
+
+Target Position:
+Cartesian : (50.00, 50.00, 400.00)
+Computed angles (Ideal): (90.0, 130.0, 19.0, 90.0, 36.0, 114.0, 135.0)
+Computed angles (Raw)  : (90.0, 130.0, 39.0, 100.0, 41.0, 119.0, 135.0)
+Action: Applying Calibrated Computed Angles (Raw) -> FK...
+Resultant Cartesian    : (50.00, 50.00, 400.00)
+--------------------------------------------------

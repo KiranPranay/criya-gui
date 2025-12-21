@@ -1,0 +1,216 @@
+existing cartician : (86.88, 54.65, 575.14)
+Target cartician: (86.90, 54.60, 500.00)
+Computed calibrated angles: (90, 93, 31, 100, 85, 112, 122)
+
+After applying angles,
+The current angles : (90, 93, 31, 100, 85, 112, 122)
+The current cartician: (92.92, 58.06, 494.81)
+------------------------------
+existing cartician : (0.00, 0.00, 590.00)
+Target cartician: (0.00, 0.00, 500.00)
+Computed calibrated angles: (90, 130, 56, 100, 59, 143, 90)
+
+After applying angles,
+The current angles : (90, 130, 56, 100, 59, 143, 90)
+The current cartician: (9.08, 0.00, 496.82)
+------------------------------
+existing cartician : (9.08, 0.00, 496.82)
+Target cartician: (100.00, 0.00, 496.80)
+Computed calibrated angles: (90, 130, 50, 100, 76, 117, 90)
+
+After applying angles,
+The current angles : (90, 130, 50, 100, 76, 117, 90)
+The current cartician: (110.48, 0.00, 492.25)
+------------------------------
+existing cartician : (110.48, 0.00, 492.25)
+Target cartician: (200.00, 0.00, 492.30)
+Computed calibrated angles: (90, 130, 78, 100, 61, 105, 90)
+
+After applying angles,
+The current angles : (90, 130, 78, 100, 61, 105, 90)
+The current cartician: (203.87, 0.00, 488.82)
+------------------------------
+existing cartician : (203.87, 0.00, 488.82)
+Target cartician: (250.00, 0.00, 488.80)
+Computed calibrated angles: (90, 130, 81, 100, 78, 84, 90)
+
+After applying angles,
+The current angles : (90, 130, 81, 100, 78, 84, 90)
+The current cartician: (259.21, 0.00, 480.86)
+------------------------------
+existing cartician : (259.21, 0.00, 480.86)
+Target cartician: (210.00, 0.00, 480.90)
+Computed calibrated angles: (90, 130, 71, 100, 66, 102, 90)
+
+After applying angles,
+The current angles : (90, 130, 71, 100, 66, 102, 90)
+The current cartician: (213.99, 0.00, 477.36)
+------------------------------
+existing cartician : (0.00, 0.00, 590.00)
+Target cartician: (0.00, 0.00, 500.00)
+Computed calibrated angles: (90, 130, 56, 100, 59, 143, 90)
+
+After applying angles,
+The current angles : (90, 130, 56, 100, 59, 143, 90)
+The current cartician: (9.08, 0.00, 496.82)
+------------------------------
+existing cartician : (9.08, 0.00, 496.82)
+Target cartician: (200.00, 0.00, 496.80)
+Computed calibrated angles: (90, 130, 75, 100, 68, 101, 90)
+
+After applying angles,
+The current angles : (90, 130, 75, 100, 68, 101, 90)
+The current cartician: (204.67, 0.00, 493.09)
+------------------------------
+existing cartician : (204.67, 0.00, 493.09)
+Target cartician: (250.00, 0.00, 493.10)
+Computed calibrated angles: (90, 130, 93, 100, 67, 88, 90)
+
+After applying angles,
+The current angles : (90, 130, 93, 100, 67, 88, 90)
+The current cartician: (257.19, 0.00, 486.13)
+------------------------------
+existing cartician : (257.19, 0.00, 486.13)
+Target cartician: (257.20, 100.00, 486.10)
+Computed calibrated angles: (90, 130, 95, 100, 77, 76, 111)
+
+After applying angles,
+The current angles : (90, 130, 95, 100, 77, 76, 111)
+The current cartician: (267.01, 102.50, 477.30)
+------------------------------
+existing cartician : (0.00, 0.00, 590.00)
+Target cartician: (0.00, 0.00, 500.00)
+Computed calibrated angles: (90, 130, 56, 100, 59, 143, 90)
+
+After applying angles,
+The current angles : (90, 130, 56, 100, 59, 143, 90)
+The current cartician: (9.08, 0.00, 496.82)
+------------------------------
+existing cartician : (9.08, 0.00, 496.82)
+Target cartician: (250.00, 0.00, 496.80)
+Computed calibrated angles: (90, 130, 90, 100, 74, 84, 90)
+
+After applying angles,
+The current angles : (90, 130, 90, 100, 74, 84, 90)
+The current cartician: (258.70, 0.00, 489.30)
+------------------------------
+existing cartician : (258.70, 0.00, 489.30)
+Target cartician: (0.00, 250.00, 300.00)
+Computed calibrated angles: (90, 130, 66, 100, 10, 128, 180)
+
+After applying angles,
+The current angles : (90, 130, 66, 100, 10, 128, 180)
+The current cartician: (0.00, 250.72, 295.68)
+------------------------------
+existing cartician : (0.00, 250.72, 295.68)
+Target cartician: (0.00, 200.00, 295.68)
+Computed calibrated angles: (90, 130, 46, 100, 13, 139, 180)
+
+After applying angles,
+The current angles : (90, 130, 46, 100, 13, 139, 180)
+The current cartician: (0.00, 202.81, 287.92)
+------------------------------
+existing cartician : (0.00, 202.81, 287.92)
+Target cartician: (100.00, 202.80, 287.92)
+Computed calibrated angles: (90, 130, 55, 100, 10, 134, 153)
+
+After applying angles,
+The current angles : (90, 130, 55, 100, 10, 134, 153)
+The current cartician: (103.24, 202.61, 283.72)
+------------------------------
+existing cartician : (103.24, 202.61, 283.72)
+Target cartician: (200.00, 202.60, 283.72)
+Computed calibrated angles: (90, 130, 77, 100, 8, 118, 135)
+
+After applying angles,
+The current angles : (90, 130, 77, 100, 8, 118, 135)
+The current cartician: (202.21, 202.21, 274.64)
+------------------------------
+existing cartician : (202.21, 202.21, 274.64)
+Target cartician: (250.00, 202.20, 274.64)
+Computed calibrated angles: (90, 130, 96, 100, 7, 106, 128)
+
+After applying angles,
+The current angles : (90, 130, 96, 100, 7, 106, 128)
+The current cartician: (254.61, 198.92, 269.26)
+------------------------------
+existing cartician : (254.61, 198.92, 269.26)
+Target cartician: (254.60, 198.90, 269.26)
+Computed calibrated angles: (90, 130, 98, 100, 5, 106, 127)
+
+After applying angles,
+The current angles : (90, 130, 98, 100, 5, 106, 127)
+The current cartician: (258.94, 195.12, 263.97)
+------------------------------
+existing cartician : (258.94, 195.12, 263.97)
+Target cartician: (258.90, 195.10, 250.00)
+Computed calibrated angles: (90, 130, 94, 100, 5, 105, 127)
+
+After applying angles,
+The current angles : (90, 130, 94, 100, 5, 105, 127)
+The current cartician: (260.15, 196.03, 244.71)
+------------------------------
+existing cartician : (260.15, 196.03, 244.71)
+Target cartician: (260.10, 196.00, 200.00)
+Computed calibrated angles: (90, 130, 79, 100, 10, 99, 127)
+
+After applying angles,
+The current angles : (90, 130, 79, 100, 10, 99, 127)
+The current cartician: (259.97, 195.90, 190.91)
+------------------------------
+existing cartician : (259.97, 195.90, 190.91)
+Target cartician: (260.00, 195.90, 150.00)
+Computed calibrated angles: (90, 130, 77, 100, 8, 94, 126)
+
+After applying angles,
+The current angles : (90, 130, 77, 100, 8, 94, 126)
+The current cartician: (262.24, 190.53, 144.96)
+------------------------------
+existing cartician : (262.24, 190.53, 144.96)
+Target cartician: (262.20, 190.50, 100.00)
+Computed calibrated angles: (90, 130, 74, 100, 9, 85, 126)
+
+After applying angles,
+The current angles : (90, 130, 74, 100, 9, 85, 126)
+The current cartician: (258.81, 188.03, 91.49)
+------------------------------
+existing cartician : (258.81, 188.03, 91.49)
+Target cartician: (258.80, 188.00, 200.00)
+Computed calibrated angles: (90, 130, 79, 100, 7, 102, 125)
+
+After applying angles,
+The current angles : (90, 130, 79, 100, 7, 102, 125)
+The current cartician: (261.53, 183.12, 190.30)
+------------------------------
+existing cartician : (261.53, 183.12, 190.30)
+Target cartician: (261.50, 183.10, 250.00)
+Computed calibrated angles: (90, 130, 82, 100, 12, 105, 124)
+
+After applying angles,
+The current angles : (90, 130, 82, 100, 12, 105, 124)
+The current cartician: (264.30, 178.27, 246.29)
+------------------------------
+existing cartician : (264.30, 178.27, 246.29)
+Target cartician: (264.30, 250.00, 246.30)
+Computed calibrated angles: (90, 130, 107, 100, 14, 88, 133)
+
+After applying angles,
+The current angles : (90, 130, 107, 100, 14, 88, 133)
+The current cartician: (266.58, 248.59, 241.11)
+------------------------------
+existing cartician : (266.58, 248.59, 241.11)
+Target cartician: (200.00, 248.60, 241.10)
+Computed calibrated angles: (90, 130, 86, 100, 7, 106, 141)
+
+After applying angles,
+The current angles : (90, 130, 86, 100, 7, 106, 141)
+The current cartician: (201.10, 248.34, 235.45)
+------------------------------
+existing cartician : (201.10, 248.34, 235.45)
+Target cartician: (150.00, 248.30, 235.50)
+Computed calibrated angles: (90, 130, 64, 100, 14, 110, 148)
+
+After applying angles,
+The current angles : (90, 130, 64, 100, 14, 110, 148)
+The current cartician: (154.39, 247.07, 225.91)
+------------------------------

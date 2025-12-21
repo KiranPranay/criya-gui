@@ -8393,3 +8393,225 @@
 2025-12-19 13:30:03,187 [INFO] === Application Started (Refactored) ===
 2025-12-19 13:30:23,861 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
 2025-12-19 13:30:23,861 [INFO] IK Success: [90, 90, 54, 90, 0, 159, 91]
+2025-12-20 10:42:22,005 [INFO] === Application Started (Refactored) ===
+2025-12-20 10:43:11,887 [INFO] IK Request: X=119.98172341876695, Y=2.0942887724740213, Z=400.0 (Flags: False,False,True)
+2025-12-20 10:43:11,887 [INFO] IK Success: [90, 90, 54, 90, 0, 159, 91]
+2025-12-20 10:54:41,557 [INFO] === Application Started (Refactored) ===
+2025-12-20 10:55:02,343 [INFO] IK Request: X=120.0, Y=2.1, Z=470.0 (Flags: True,True,True)
+2025-12-20 10:55:06,279 [INFO] IK Request: X=120.0, Y=2.1, Z=400.0 (Flags: True,True,True)
+2025-12-20 10:55:09,784 [INFO] IK Request: X=120.0, Y=2.1, Z=400.0 (Flags: True,True,True)
+2025-12-20 10:55:38,132 [INFO] IK Request: X=120.0, Y=2.1, Z=400.0 (Flags: True,True,True)
+2025-12-20 10:55:38,337 [INFO] IK Request: X=120.0, Y=2.1, Z=400.0 (Flags: True,True,True)
+2025-12-20 10:55:38,539 [INFO] IK Request: X=120.0, Y=2.1, Z=400.0 (Flags: True,True,True)
+2025-12-20 10:55:38,673 [INFO] IK Request: X=120.0, Y=2.1, Z=400.0 (Flags: True,True,True)
+2025-12-20 10:56:37,073 [INFO] === Application Started (Refactored) ===
+2025-12-20 10:56:51,209 [INFO] IK Request: X=120.0, Y=2.1, Z=400.0 (Flags: True,True,True)
+2025-12-20 10:56:51,209 [INFO] IK Found Solution at Pitch 10: S6=130.5, S5=47.3, S3=12.2
+2025-12-20 10:56:51,209 [INFO] IK Success: [90, 90, 12, 90, 47, 130, 91]
+2025-12-20 11:05:10,346 [INFO] === Application Started (Refactored) ===
+2025-12-20 11:05:29,979 [INFO] IK Request: X=120.0, Y=2.1, Z=400.0 (Flags: True,True,True)
+2025-12-20 11:05:29,979 [INFO] IK Found Solution at Pitch 10: S6=130.5, S5=47.3, S3=12.2
+2025-12-20 11:05:29,979 [INFO] IK Success: [90, 90, 12, 90, 47, 130, 91]
+2025-12-20 11:08:16,821 [INFO] === Application Started (Refactored) ===
+2025-12-20 11:08:44,345 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:08:44,345 [WARNING] IK Failed: Unreachable (178.5, 19.9, 300.0)
+2025-12-20 11:08:49,008 [INFO] IK Request: X=178.4953147032457, Y=19.871347485513027, Z=300.0 (Flags: False,False,True)
+2025-12-20 11:08:49,008 [WARNING] IK Failed: Unreachable (178.4953147032457, 19.871347485513027, 300.0)
+2025-12-20 11:12:27,191 [INFO] === Application Started (Refactored) ===
+2025-12-20 11:21:44,054 [INFO] === Application Started (Refactored) ===
+2025-12-20 11:22:13,219 [INFO] IK Request: X=178.5, Y=19.9, Z=350.0 (Flags: True,True,True)
+2025-12-20 11:22:13,219 [INFO] IK Found Solution at Pitch 0: S6=132.0, S5=23.3, S3=24.7
+2025-12-20 11:22:16,062 [INFO] IK Request: X=178.5, Y=19.9, Z=350.0 (Flags: True,True,True)
+2025-12-20 11:22:16,062 [INFO] IK Found Solution at Pitch 0: S6=132.0, S5=23.3, S3=24.7
+2025-12-20 11:22:16,402 [INFO] IK Request: X=178.5, Y=19.9, Z=350.0 (Flags: True,True,True)
+2025-12-20 11:22:16,402 [INFO] IK Found Solution at Pitch 0: S6=132.0, S5=23.3, S3=24.7
+2025-12-20 11:22:16,540 [INFO] IK Request: X=178.5, Y=19.9, Z=350.0 (Flags: True,True,True)
+2025-12-20 11:22:16,540 [INFO] IK Found Solution at Pitch 0: S6=132.0, S5=23.3, S3=24.7
+2025-12-20 11:22:16,815 [INFO] IK Request: X=178.5, Y=19.9, Z=350.0 (Flags: True,True,True)
+2025-12-20 11:22:16,815 [INFO] IK Found Solution at Pitch 0: S6=132.0, S5=23.3, S3=24.7
+2025-12-20 11:22:16,957 [INFO] IK Request: X=178.5, Y=19.9, Z=350.0 (Flags: True,True,True)
+2025-12-20 11:22:16,957 [INFO] IK Found Solution at Pitch 0: S6=132.0, S5=23.3, S3=24.7
+2025-12-20 11:22:17,183 [INFO] IK Request: X=178.5, Y=19.9, Z=350.0 (Flags: True,True,True)
+2025-12-20 11:22:17,183 [INFO] IK Found Solution at Pitch 0: S6=132.0, S5=23.3, S3=24.7
+2025-12-20 11:22:17,388 [INFO] IK Request: X=178.5, Y=19.9, Z=350.0 (Flags: True,True,True)
+2025-12-20 11:22:17,388 [INFO] IK Found Solution at Pitch 0: S6=132.0, S5=23.3, S3=24.7
+2025-12-20 11:22:26,226 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:22:26,226 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 11:22:26,432 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:22:26,432 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 11:22:26,634 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:22:26,634 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 11:22:26,855 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:22:26,856 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 11:22:26,992 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:22:26,992 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 11:22:27,129 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:22:27,129 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 11:22:27,340 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:22:27,341 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 11:22:27,478 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:22:27,478 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 11:22:27,687 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:22:27,687 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 11:22:27,824 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 11:22:27,825 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 11:29:29,330 [INFO] === Application Started (Refactored) ===
+2025-12-20 11:29:51,455 [INFO] IK Request: X=178.4953147032457, Y=19.871347485513027, Z=350.0 (Flags: False,False,True)
+2025-12-20 11:29:51,455 [INFO] IK Found Solution at Pitch 0: S6=132.0, S5=23.3, S3=24.7
+2025-12-20 11:29:51,455 [INFO] IK Success: [90, 130, 44, 100, 28, 136, 96]
+2025-12-20 11:30:01,273 [INFO] IK Request: X=59.65820263719563, Y=6.270329765507205, Z=300.0 (Flags: False,False,True)
+2025-12-20 11:30:01,273 [WARNING] IK Failed: Unreachable (59.65820263719563, 6.270329765507205, 300.0)
+2025-12-20 11:30:17,786 [INFO] IK Request: X=59.65820263719563, Y=6.270329765507205, Z=50.0 (Flags: False,False,True)
+2025-12-20 11:30:17,787 [WARNING] IK Failed: Unreachable (59.65820263719563, 6.270329765507205, 50.0)
+2025-12-20 11:30:26,030 [INFO] IK Request: X=59.65820263719563, Y=6.270329765507205, Z=310.0 (Flags: False,False,True)
+2025-12-20 11:30:26,030 [INFO] IK Found Solution at Pitch 10: S6=179.2, S5=5.2, S3=5.5
+2025-12-20 11:30:26,030 [INFO] IK Success: [90, 130, 25, 100, 10, 184, 96]
+2025-12-20 11:30:29,426 [WARNING] Servo 6 Clamped: 182 -> 180
+2025-12-20 11:30:29,566 [WARNING] Servo 6 Clamped: 182 -> 180
+2025-12-20 11:30:29,703 [WARNING] Servo 6 Clamped: 183 -> 180
+2025-12-20 11:30:29,768 [WARNING] Servo 6 Clamped: 184 -> 180
+2025-12-20 11:30:29,901 [WARNING] Servo 6 Clamped: 184 -> 180
+2025-12-20 11:30:30,100 [WARNING] Servo 6 Clamped: 185 -> 180
+2025-12-20 11:53:07,419 [INFO] === Application Started (Refactored) ===
+2025-12-20 11:53:32,388 [INFO] IK Request: X=178.5, Y=19.9, Z=380.0 (Flags: True,True,True)
+2025-12-20 11:53:32,388 [INFO] IK Found Solution at Pitch 0: S6=114.8, S5=52.2, S3=13.0
+2025-12-20 11:53:32,388 [INFO] IK Success: [90, 130, 32, 100, 57, 119, 96]
+2025-12-20 12:08:23,895 [INFO] === Application Started (Refactored) ===
+2025-12-20 12:08:40,396 [INFO] IK Request: X=178.1, Y=23.0, Z=300.0 (Flags: True,True,True)
+2025-12-20 12:08:40,396 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 12:08:40,396 [INFO] IK Success: [90, 130, 48, 100, 5, 150, 97]
+2025-12-20 12:27:10,757 [INFO] === Application Started (Refactored) ===
+2025-12-20 12:27:31,160 [INFO] IK Request: X=178.1, Y=23.0, Z=300.0 (Flags: True,True,True)
+2025-12-20 12:27:31,160 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 12:27:31,161 [INFO] IK Success: [90, 130, 48, 100, 5, 150, 97]
+2025-12-20 12:40:12,088 [INFO] === Application Started (Refactored) ===
+2025-12-20 12:40:34,177 [INFO] IK Request: X=120.0, Y=0.0, Z=400.0 (Flags: True,True,True)
+2025-12-20 12:40:34,177 [INFO] IK Found Solution at Pitch 10: S6=130.5, S5=47.3, S3=12.2
+2025-12-20 12:40:34,178 [INFO] IK Success: [90, 130, 32, 100, 52, 135, 90]
+2025-12-20 12:41:45,569 [ERROR] Connect error: could not open port 'COM10': OSError(22, 'The semaphore timeout period has expired.', None, 121)
+2025-12-20 12:42:13,625 [INFO] IK Request: X=178.5, Y=19.9, Z=300.0 (Flags: True,True,True)
+2025-12-20 12:42:13,625 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 12:42:13,625 [INFO] IK Success: [90, 130, 48, 100, 5, 150, 96]
+2025-12-20 12:47:29,231 [INFO] === Application Started (Refactored) ===
+2025-12-20 12:48:16,156 [INFO] IK Request: X=178.4953147032457, Y=19.871347485513027, Z=300.0 (Flags: False,False,True)
+2025-12-20 12:48:16,156 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 12:48:16,156 [INFO] IK Success: [90, 130, 48, 100, 5, 150, 96]
+2025-12-20 13:00:09,403 [INFO] IK Request: X=178.4953147032457, Y=19.871347485513027, Z=300.0 (Flags: False,False,True)
+2025-12-20 13:00:09,403 [INFO] IK Found Solution at Pitch -5: S6=145.9, S5=0.9, S3=28.1
+2025-12-20 13:00:09,403 [INFO] IK Success: [90, 130, 48, 100, 5, 150, 96]
+2025-12-20 14:27:14,220 [INFO] === Application Started (Refactored) ===
+2025-12-20 14:28:05,384 [INFO] IK Request: X=86.9, Y=54.6, Z=500.0 (Flags: True,True,True)
+2025-12-20 14:28:05,384 [INFO] IK Found Solution at Pitch 35: S6=107.1, S5=81.0, S3=26.9
+2025-12-20 14:28:05,384 [INFO] IK Success: [90, 93, 31, 100, 85, 112, 122]
+2025-12-20 14:28:06,437 [INFO] IK Request: X=87.8, Y=56.0, Z=573.9 (Flags: True,True,True)
+2025-12-20 14:28:06,438 [INFO] IK Found Solution at Pitch 70: S6=89.5, S5=76.9, S3=83.6
+2025-12-20 14:28:06,438 [INFO] IK Success: [90, 93, 88, 100, 81, 94, 122]
+2025-12-20 14:28:46,145 [INFO] IK Request: X=86.9, Y=54.6, Z=500.0 (Flags: True,True,True)
+2025-12-20 14:28:46,145 [INFO] IK Found Solution at Pitch 35: S6=107.1, S5=81.0, S3=26.9
+2025-12-20 14:28:46,145 [INFO] IK Success: [90, 93, 31, 100, 85, 112, 122]
+2025-12-20 14:39:47,683 [INFO] === Application Started (Refactored) ===
+2025-12-20 14:40:07,902 [INFO] IK Request: X=0.0, Y=0.0, Z=500.0 (Flags: True,True,True)
+2025-12-20 14:40:07,902 [INFO] IK Found Solution at Pitch 50: S6=138.3, S5=55.0, S3=36.7
+2025-12-20 14:40:07,902 [INFO] IK Success: [90, 130, 56, 100, 59, 143, 90]
+2025-12-20 14:40:37,945 [INFO] IK Request: X=100.0, Y=0.0, Z=496.8 (Flags: True,False,True)
+2025-12-20 14:40:37,945 [INFO] IK Found Solution at Pitch 35: S6=113.0, S5=71.8, S3=30.2
+2025-12-20 14:40:37,945 [INFO] IK Success: [90, 130, 50, 100, 76, 117, 90]
+2025-12-20 14:40:46,893 [INFO] IK Request: X=200.0, Y=0.0, Z=492.3 (Flags: True,False,True)
+2025-12-20 14:40:46,893 [INFO] IK Found Solution at Pitch 35: S6=100.1, S5=56.5, S3=58.3
+2025-12-20 14:40:46,893 [INFO] IK Success: [90, 130, 78, 100, 61, 105, 90]
+2025-12-20 14:40:53,608 [INFO] IK Request: X=300.0, Y=0.0, Z=488.8 (Flags: True,False,True)
+2025-12-20 14:40:53,608 [WARNING] IK Failed: Unreachable (300.0, 0.0, 488.8)
+2025-12-20 14:40:59,923 [INFO] IK Request: X=300.0, Y=0.0, Z=488.8 (Flags: True,False,True)
+2025-12-20 14:40:59,923 [WARNING] IK Failed: Unreachable (300.0, 0.0, 488.8)
+2025-12-20 14:41:11,004 [INFO] IK Request: X=300.0, Y=10.0, Z=488.8 (Flags: True,True,True)
+2025-12-20 14:41:11,004 [WARNING] IK Failed: Unreachable (300.0, 10.0, 488.8)
+2025-12-20 14:41:34,850 [INFO] IK Request: X=350.0, Y=0.0, Z=488.8 (Flags: True,False,True)
+2025-12-20 14:41:34,851 [WARNING] IK Failed: Unreachable (350.0, 0.0, 488.8)
+2025-12-20 14:41:40,533 [INFO] IK Request: X=250.0, Y=0.0, Z=488.8 (Flags: True,False,True)
+2025-12-20 14:41:40,534 [INFO] IK Found Solution at Pitch 35: S6=79.7, S5=73.9, S3=61.4
+2025-12-20 14:41:40,534 [INFO] IK Success: [90, 130, 81, 100, 78, 84, 90]
+2025-12-20 14:41:47,524 [INFO] IK Request: X=210.0, Y=0.0, Z=480.9 (Flags: True,False,True)
+2025-12-20 14:41:47,524 [INFO] IK Found Solution at Pitch 30: S6=97.3, S5=61.4, S3=51.3
+2025-12-20 14:41:47,524 [INFO] IK Success: [90, 130, 71, 100, 66, 102, 90]
+2025-12-20 14:50:15,496 [INFO] === Application Started (Refactored) ===
+2025-12-20 14:50:34,363 [INFO] IK Request: X=0.0, Y=0.0, Z=500.0 (Flags: True,True,True)
+2025-12-20 14:50:34,363 [INFO] IK Found Solution at Pitch 50: S6=138.3, S5=55.0, S3=36.7
+2025-12-20 14:50:34,364 [INFO] IK Success: [90, 130, 56, 100, 59, 143, 90]
+2025-12-20 14:50:44,287 [INFO] IK Request: X=200.0, Y=0.0, Z=496.8 (Flags: True,True,True)
+2025-12-20 14:50:44,287 [INFO] IK Found Solution at Pitch 35: S6=96.1, S5=63.9, S3=55.0
+2025-12-20 14:50:44,287 [INFO] IK Success: [90, 130, 75, 100, 68, 101, 90]
+2025-12-20 14:50:52,663 [INFO] IK Request: X=250.0, Y=0.0, Z=493.1 (Flags: True,True,True)
+2025-12-20 14:50:52,663 [INFO] IK Found Solution at Pitch 40: S6=83.3, S5=62.8, S3=73.9
+2025-12-20 14:50:52,663 [INFO] IK Success: [90, 130, 93, 100, 67, 88, 90]
+2025-12-20 14:50:58,573 [INFO] IK Request: X=257.2, Y=100.0, Z=486.1 (Flags: True,True,True)
+2025-12-20 14:50:58,574 [INFO] IK Found Solution at Pitch 40: S6=71.9, S5=72.9, S3=75.2
+2025-12-20 14:50:58,574 [INFO] IK Success: [90, 130, 95, 100, 77, 76, 111]
+2025-12-20 14:51:05,161 [INFO] IK Request: X=267.0, Y=200.0, Z=477.3 (Flags: True,True,True)
+2025-12-20 14:51:05,161 [WARNING] IK Failed: Unreachable (267.0, 200.0, 477.3)
+2025-12-20 14:51:10,836 [INFO] IK Request: X=267.0, Y=250.0, Z=477.3 (Flags: True,True,True)
+2025-12-20 14:51:10,836 [WARNING] IK Failed: Unreachable (267.0, 250.0, 477.3)
+2025-12-20 14:51:14,487 [INFO] IK Request: X=267.014835317109, Y=250.0, Z=477.3 (Flags: False,True,True)
+2025-12-20 14:51:14,487 [WARNING] IK Failed: Unreachable (267.014835317109, 250.0, 477.3)
+2025-12-20 14:51:17,597 [INFO] IK Request: X=267.014835317109, Y=250.0, Z=477.30472081775173 (Flags: False,True,False)
+2025-12-20 14:51:17,597 [WARNING] IK Failed: Unreachable (267.014835317109, 250.0, 477.30472081775173)
+2025-12-20 14:51:20,638 [INFO] IK Request: X=267.014835317109, Y=250.0, Z=477.30472081775173 (Flags: False,True,False)
+2025-12-20 14:51:20,638 [WARNING] IK Failed: Unreachable (267.014835317109, 250.0, 477.30472081775173)
+2025-12-20 14:51:24,771 [INFO] IK Request: X=267.014835317109, Y=250.0, Z=477.30472081775173 (Flags: False,True,False)
+2025-12-20 14:51:24,771 [WARNING] IK Failed: Unreachable (267.014835317109, 250.0, 477.30472081775173)
+2025-12-20 14:51:27,358 [INFO] IK Request: X=267.014835317109, Y=250.0, Z=477.30472081775173 (Flags: False,True,False)
+2025-12-20 14:51:27,358 [WARNING] IK Failed: Unreachable (267.014835317109, 250.0, 477.30472081775173)
+2025-12-20 14:54:39,419 [INFO] === Application Started (Refactored) ===
+2025-12-20 14:54:51,846 [INFO] IK Request: X=0.0, Y=0.0, Z=500.0 (Flags: True,True,True)
+2025-12-20 14:54:51,846 [INFO] IK Found Solution at Pitch 50: S6=138.3, S5=55.0, S3=36.7
+2025-12-20 14:54:51,846 [INFO] IK Success: [90, 130, 56, 100, 59, 143, 90]
+2025-12-20 14:55:01,497 [INFO] IK Request: X=250.0, Y=0.0, Z=496.8 (Flags: True,True,True)
+2025-12-20 14:55:01,497 [INFO] IK Found Solution at Pitch 40: S6=79.5, S5=69.9, S3=70.6
+2025-12-20 14:55:01,497 [INFO] IK Success: [90, 130, 90, 100, 74, 84, 90]
+2025-12-20 14:55:11,276 [INFO] IK Request: X=258.6966623546429, Y=250.0, Z=489.29670460646906 (Flags: False,True,False)
+2025-12-20 14:55:11,276 [INFO] IK Strict Failed. Attempting relaxation (Flags: False,True,False)
+2025-12-20 14:55:11,276 [INFO] IK Found Solution at Pitch -5: S6=123.1, S5=5.4, S3=46.5
+2025-12-20 14:55:11,276 [INFO] Relaxation Success at (0, 250.0, 300)
+2025-12-20 14:55:11,276 [INFO] IK Success: [90, 130, 66, 100, 10, 128, 180]
+2025-12-20 14:55:24,486 [INFO] IK Request: X=1.535197340396562e-14, Y=200.0, Z=295.68494649173545 (Flags: False,True,False)
+2025-12-20 14:55:24,486 [INFO] IK Found Solution at Pitch -10: S6=134.8, S5=8.6, S3=26.6
+2025-12-20 14:55:24,486 [INFO] IK Success: [90, 130, 46, 100, 13, 139, 180]
+2025-12-20 14:55:47,814 [INFO] IK Request: X=100.0, Y=202.8, Z=287.9196631402169 (Flags: True,True,False)
+2025-12-20 14:55:47,814 [INFO] IK Found Solution at Pitch -10: S6=129.4, S5=5.3, S3=35.3
+2025-12-20 14:55:47,814 [INFO] IK Success: [90, 130, 55, 100, 10, 134, 153]
+2025-12-20 14:55:54,838 [INFO] IK Request: X=200.0, Y=202.6, Z=283.7218086975548 (Flags: True,True,False)
+2025-12-20 14:55:54,838 [INFO] IK Found Solution at Pitch -5: S6=113.4, S5=3.7, S3=57.9
+2025-12-20 14:55:54,838 [INFO] IK Success: [90, 130, 77, 100, 8, 118, 135]
+2025-12-20 14:56:01,554 [INFO] IK Request: X=250.0, Y=202.2, Z=274.6435882025961 (Flags: True,True,False)
+2025-12-20 14:56:01,554 [INFO] IK Found Solution at Pitch 0: S6=101.5, S5=2.3, S3=76.2
+2025-12-20 14:56:01,554 [INFO] IK Success: [90, 130, 96, 100, 7, 106, 128]
+2025-12-20 14:56:09,963 [INFO] IK Request: X=254.6, Y=198.9, Z=269.25945618174853 (Flags: True,True,False)
+2025-12-20 14:56:09,963 [INFO] IK Found Solution at Pitch 0: S6=101.4, S5=0.4, S3=78.2
+2025-12-20 14:56:09,963 [INFO] IK Success: [90, 130, 98, 100, 5, 106, 127]
+2025-12-20 14:56:17,758 [INFO] IK Request: X=258.9, Y=195.1, Z=250.0 (Flags: True,True,True)
+2025-12-20 14:56:17,758 [INFO] IK Found Solution at Pitch -5: S6=100.7, S5=0.1, S3=74.2
+2025-12-20 14:56:17,759 [INFO] IK Success: [90, 130, 94, 100, 5, 105, 127]
+2025-12-20 14:56:23,628 [INFO] IK Request: X=260.1, Y=196.0, Z=200.0 (Flags: True,True,True)
+2025-12-20 14:56:23,628 [INFO] IK Found Solution at Pitch -20: S6=94.9, S5=5.2, S3=59.9
+2025-12-20 14:56:23,628 [INFO] IK Success: [90, 130, 79, 100, 10, 99, 127]
+2025-12-20 14:56:28,982 [INFO] IK Request: X=260.0, Y=195.9, Z=150.0 (Flags: True,True,True)
+2025-12-20 14:56:28,982 [INFO] IK Found Solution at Pitch -30: S6=89.1, S5=3.7, S3=57.2
+2025-12-20 14:56:28,982 [INFO] IK Success: [90, 130, 77, 100, 8, 94, 126]
+2025-12-20 14:56:35,293 [INFO] IK Request: X=262.2, Y=190.5, Z=100.0 (Flags: True,True,True)
+2025-12-20 14:56:35,293 [INFO] IK Found Solution at Pitch -40: S6=80.3, S5=4.9, S3=54.8
+2025-12-20 14:56:35,293 [INFO] IK Success: [90, 130, 74, 100, 9, 85, 126]
+2025-12-20 14:56:45,095 [INFO] IK Request: X=258.8, Y=188.0, Z=200.0 (Flags: True,True,True)
+2025-12-20 14:56:45,095 [INFO] IK Found Solution at Pitch -20: S6=97.6, S5=2.7, S3=59.7
+2025-12-20 14:56:45,095 [INFO] IK Success: [90, 130, 79, 100, 7, 102, 125]
+2025-12-20 14:56:55,327 [INFO] IK Request: X=261.5, Y=183.1, Z=250.0 (Flags: True,True,True)
+2025-12-20 14:56:55,327 [INFO] IK Found Solution at Pitch -10: S6=100.0, S5=7.1, S3=62.9
+2025-12-20 14:56:55,327 [INFO] IK Success: [90, 130, 82, 100, 12, 105, 124]
+2025-12-20 14:57:08,404 [INFO] IK Request: X=264.3, Y=250.0, Z=246.3 (Flags: True,True,True)
+2025-12-20 14:57:08,404 [INFO] IK Found Solution at Pitch 0: S6=83.3, S5=9.3, S3=87.4
+2025-12-20 14:57:08,404 [INFO] IK Success: [90, 130, 107, 100, 14, 88, 133]
+2025-12-20 14:57:22,294 [INFO] IK Request: X=200.0, Y=248.6, Z=241.1 (Flags: True,True,True)
+2025-12-20 14:57:22,294 [INFO] IK Found Solution at Pitch -10: S6=101.3, S5=2.7, S3=66.1
+2025-12-20 14:57:22,294 [INFO] IK Success: [90, 130, 86, 100, 7, 106, 141]
+2025-12-20 14:57:28,718 [INFO] IK Request: X=150.0, Y=248.3, Z=235.5 (Flags: True,True,True)
+2025-12-20 14:57:28,719 [INFO] IK Found Solution at Pitch -20: S6=106.0, S5=9.6, S3=44.5
+2025-12-20 14:57:28,719 [INFO] IK Success: [90, 130, 64, 100, 14, 110, 148]
+2025-12-20 17:20:36,231 [ERROR] Write error: WriteFile failed (PermissionError(13, 'The device does not recognize the command.', None, 22))

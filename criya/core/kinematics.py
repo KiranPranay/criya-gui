@@ -1,6 +1,7 @@
 from __future__ import annotations
 import math
 import numpy as np
+import logging
 from typing import List, Optional
 
 # -------------------- Matrix Helpers --------------------
@@ -45,8 +46,10 @@ class Kinematics:
         self.L_SEG3 = 75     # Wrist2 to Gripper Base
         self.L_TOOL = 120    # Gripper Length
         
-        # Load from config if available (Geometry section)
-        self.update_lengths(config.get("geometry", {}))
+        # Load from config if available (Geometry section or Root)
+        # Some configs have flat keys, some have "geometry" dict
+        geo_config = config.get("geometry", config) 
+        self.update_lengths(geo_config)
         
         # Calibration offsets (degrees)
         self.calib = [90, 130, 110, 100, 95, 95, 90]
@@ -54,12 +57,31 @@ class Kinematics:
             self.calib = config["calibration"]
 
     def update_lengths(self, cfg: dict):
-        self.L_BASE = float(cfg.get("L_BASE", 120))
-        self.L_HUMERUS = float(cfg.get("L_HUMERUS", 120))
-        self.L_SEG1 = float(cfg.get("L_SEG1", 70))
-        self.L_SEG2 = float(cfg.get("L_SEG2", 85))
-        self.L_SEG3 = float(cfg.get("L_SEG3", 75))
-        self.L_TOOL = float(cfg.get("L_TOOL", 120))
+        # Base
+        if "L_BASE" in cfg: self.L_BASE = float(cfg["L_BASE"])
+        elif "link_base" in cfg: self.L_BASE = float(cfg["link_base"])
+        
+        # Humerus
+        if "L_HUMERUS" in cfg: self.L_HUMERUS = float(cfg["L_HUMERUS"])
+        elif "link_humerus" in cfg: self.L_HUMERUS = float(cfg["link_humerus"])
+        
+        # Seg1 (Forearm) - Prioritize link_forearm (75) over link_seg1 (70) if both exist?
+        # Usually link_forearm is the intended user value in this older config format
+        if "L_SEG1" in cfg: self.L_SEG1 = float(cfg["L_SEG1"])
+        elif "link_forearm" in cfg: self.L_SEG1 = float(cfg["link_forearm"])
+        elif "link_seg1" in cfg: self.L_SEG1 = float(cfg["link_seg1"])
+        
+        # Seg2
+        if "L_SEG2" in cfg: self.L_SEG2 = float(cfg["L_SEG2"])
+        elif "link_seg2" in cfg: self.L_SEG2 = float(cfg["link_seg2"])
+        
+        # Seg3
+        if "L_SEG3" in cfg: self.L_SEG3 = float(cfg["L_SEG3"])
+        elif "link_seg3" in cfg: self.L_SEG3 = float(cfg["link_seg3"])
+        
+        # Tool
+        if "L_TOOL" in cfg: self.L_TOOL = float(cfg["L_TOOL"])
+        elif "link_tool" in cfg: self.L_TOOL = float(cfg["link_tool"])
 
     def get_ideal(self, raw, idx):
         # ideal = raw - (calib - 90)
@@ -76,39 +98,39 @@ class Kinematics:
         T = np.eye(4)
         
         # 1. Base (S7) - Pan (X-Forward)
-        theta1 = math.radians(angles[6] - 90)
+        # Use Ideal Angle
+        val7 = self.get_ideal(angles[6], 6)
+        theta1 = math.radians(val7 - 90)
         T = T @ rot_z(theta1) @ trans(0, 0, self.L_BASE)
         
         # 2. Shoulder (S6) - PITCH (Rot Y)
-        # User: "<90 is Forward". 0->+90(Forward).
-        # Old: (angle - 90). 0->-90. 180->+90.
-        # New: (90 - angle). 0->+90. 180->-90.
-        theta2 = math.radians(90 - angles[5])
+        val6 = self.get_ideal(angles[5], 5)
+        theta2 = math.radians(90 - val6)
         T = T @ rot_y(theta2) @ trans(0, 0, self.L_HUMERUS)
         
         # 3. Elbow (S5) - PITCH (Rot Y)
-        # User: "<90 is Forward".
-        theta3 = math.radians(90 - angles[4])
+        val5 = self.get_ideal(angles[4], 4)
+        theta3 = math.radians(90 - val5)
         T = T @ rot_y(theta3) @ trans(0, 0, self.L_SEG1)
         
         # 4. Wrist 1 (S4) - LATERAL BEND (Rot X)
-        # User: "Servo 4 in y direction" -> Y-Motion = Lateral = Rot X.
-        theta4 = math.radians(angles[3] - 90)
+        val4 = self.get_ideal(angles[3], 3)
+        theta4 = math.radians(val4 - 90)
         T = T @ rot_x(theta4) @ trans(0, 0, self.L_SEG2) 
         
         # 5. Wrist 2 (S3) - PITCH (Rot Y)
-        # User: "<90 is Forward".
-        theta5 = math.radians(90 - angles[2])
+        val3 = self.get_ideal(angles[2], 2)
+        theta5 = math.radians(90 - val3)
         T = T @ rot_y(theta5) @ trans(0, 0, self.L_SEG3)
         
         # 6. Wrist 3 (S2) - ROLL (Rot X / Parallel to Tool)
-        # User: "Servo 2 motion is okay" (Roll along X).
-        theta6 = math.radians(angles[1] - 90)
+        val2 = self.get_ideal(angles[1], 1)
+        theta6 = math.radians(val2 - 90)
         T = T @ rot_x(theta6)
         
         # 7. Tool Offset (Fixed)
-        # Forward (X).
-        T = T @ trans(self.L_TOOL, 0, 0)
+        # Forward (Z-axis of the last frame, collinear with arm)
+        T = T @ trans(0, 0, self.L_TOOL)
         
         # 8. S1 (Tip) - Removed Visualization request.
         # Just return current Tool Tip position.
@@ -139,14 +161,18 @@ class Kinematics:
         except ValueError:
             return None
 
-    def _is_valid_angle(self, deg: float) -> bool:
-        # Allow slight leniency 
-        return -5 <= deg <= 185
+
 
     def check_solution(self, s6, s5, s3):
         # 4. Check Limits (Strict)
-        if self._is_valid_angle(s6) and self._is_valid_angle(s5) and self._is_valid_angle(s3):
-             # Clamp output to 0-180
+        # We DO NOT clamp large errors. If the math says -5 deg, and we clamp to 0, 
+        # the physical tip will be centimeters away from target.
+        # Allow minute float error only.
+        tolerance = 0.1
+        if (-tolerance <= s6 <= 180+tolerance) and \
+           (-tolerance <= s5 <= 180+tolerance) and \
+           (-tolerance <= s3 <= 180+tolerance):
+             # Safe to clamp tiny epsilon
              s6 = max(0, min(180, s6))
              s5 = max(0, min(180, s5))
              s3 = max(0, min(180, s3))
@@ -158,24 +184,21 @@ class Kinematics:
         
         theta1 = math.atan2(y, x)
         angle_base = math.degrees(theta1) + 90
-        if not self._is_valid_angle(angle_base):
-             # Try 180 flip?
+        if not (-0.1 <= angle_base <= 180.1):
              return None
         angle_base = max(0, min(180, angle_base))
 
         r_total = math.sqrt(x*x + y*y)
         z_local = z - self.L_BASE
         
-        # Define Strategies
-        # 1. Inline Tool (Max Reach) - S3 Fixed 90
-        # 2. Horizontal Tool (Close Body) - S3 Variable
+        # Adaptive Strategies: Iterative Pitch Search
+        # We scan a wide range of pitches (-90 Down to +120 Back)
+        # We take the FIRST solution that strictly respects geometry and limits.
         
-        # Adaptive Strategies: Try Pointing Tool at different pitches (0=Horiz, 90=Vert).
-        # We start with 0 because user prefers horizontal.
-        # If reachable, we stop and use it.
-        # If not, we tilt up (30, 45...) until reachable.
-        
-        pitches = [0, 30, 45, 60, 90]
+        # Sort pitches to prefer near-horizontal (0) first, then outward.
+        # e.g. 0, 5, -5, 10, -10 ...
+        scan = list(range(-90, 121, 5))
+        pitches = sorted(scan, key=lambda x: abs(x))
         
         # Hand Length (Pivot S3 to Tip) is Seg3 + Tool
         H_L = self.L_SEG3 + self.L_TOOL
@@ -192,51 +215,57 @@ class Kinematics:
             H_x = H_L * math.cos(pitch_rad)
             H_z = H_L * math.sin(pitch_rad)
             
-            # Wrist Target (S3 Position)
-            # R_s3 = R_tip - H_x
-            # Z_s3 = Z_tip - H_z
-            # (Note: Z_tip is local relative to base shoulder)
+            # Wrist Target
             r_wrist = r_total - H_x
             z_wrist = z_local - H_z
             
-            # Solve 2-Link for S3 position
+            # Solve 2-Link
             res = self._solve_2link(r_wrist, z_wrist, L1, L2_arm)
             if not res: 
                 continue
                 
             alpha, gamma, beta = res
             
-            # Solve Angles (Standard Elbow Up)
+            # Solve Angles
             q_shoulder = math.degrees(beta + alpha)
             q_elbow = math.degrees(gamma)
             
-            # Map to Servos
             s6 = q_shoulder
             s5 = q_elbow - 90
-            
-            # S3 Logic for Defined Pitch
-            # We want Global Tool Pitch = pitch_deg (Angle from Horizon)
-            # Global rotations Sum = 90 - pitch_deg.
-            # Sum = (90-q_s) + (180-q_e) + (90-s3) = 360 - q_s - q_e - s3.
-            # 90 - pitch = 360 - q_s - q_e - s3
-            # s3 = 360 - 90 - q_s - q_e + pitch
-            # s3 = 270 - (q_shoulder + q_elbow) + pitch_deg
-            
             s3 = 270 - (q_shoulder + q_elbow) + pitch_deg
             
-            # Check and Clamp
+            # Strictly Check
             cleaned = self.check_solution(s6, s5, s3)
             if cleaned:
-                # Found a valid strategy!
-                sol = [90]*7
-                sol[6] = int(angle_base)
-                sol[5] = int(cleaned[0])
-                sol[4] = int(cleaned[1])
-                sol[2] = int(cleaned[2]) # S3 is Index 2
+                logging.info(f"IK Found Solution at Pitch {pitch_deg}: S6={cleaned[0]:.1f}, S5={cleaned[1]:.1f}, S3={cleaned[2]:.1f}")
+                # Need to map geometric angles (ideal) to Raw Servo Values
+                
+                # Base (Idx 6)
+                raw_base = self.get_raw(angle_base, 6)
+                # Shoulder (Idx 5) - s6 computed is geometric
+                raw_s6 = self.get_raw(cleaned[0], 5)
+                # Elbow (Idx 4) - s5 computed is geometric
+                raw_s5 = self.get_raw(cleaned[1], 4)
+                # Wrist (Idx 2) - s3 computed is geometric
+                raw_s3 = self.get_raw(cleaned[2], 2)
+                
+                # Fixed Joints (S4, S2, S1) should be at Geometric 90
+                raw_s4 = self.get_raw(90, 3)
+                raw_s2 = self.get_raw(90, 1)
+                raw_s1 = self.get_raw(90, 0)
+                
+                # Construct Solution
+                sol = [0] * 7
+                sol[6] = int(raw_base)
+                sol[5] = int(raw_s6)
+                sol[4] = int(raw_s5)
+                sol[3] = int(raw_s4)
+                sol[2] = int(raw_s3)
+                sol[1] = int(raw_s2)
+                sol[0] = int(raw_s1)
+                
                 valid_solutions.append(sol)
-                # Since we prioritize small pitch, we can break early if we just want "First Working"
-                # But to maintain old structure of "valid_solutions", we can collect and break?
-                # Actually, breaking here is best efficiently.
+                # Found the "flattest" valid pitch. Use it.
                 break
                 
         if not valid_solutions:
